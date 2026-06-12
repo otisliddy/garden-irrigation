@@ -1,0 +1,15 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/garden-irrigation.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["README.md", "cdk*.json", "**/*.d.ts", "**/*.js", "node_modules"]
+  },
+  "context": {
+    "alertEmail": "REPLACE_WITH_YOUR_EMAIL",
+    "@aws-cdk/core:defaultCrossStackReferences": "both",
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:target-partitions": ["aws"]
+  }
+}

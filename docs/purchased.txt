@@ -1,0 +1,31 @@
+# Purchaed
+- Solar Panel Kit 25W 12V MONO: 25W Solar Panel + Mounting Bracket + SAE Connection Cable + 10A Charge Controller
+- LiFePO4 12V 8Ah Rechargeable Lithium Battery with BMS Protection
+- DollaTek ESP32-S3-DevKitC-1 ESP32-S3
+- ESP32-S3 Screw Shield Board, 44Pins GPIO 1 to 3 Expansion Board for ESP32-S3 GPIO Connector Terminal Converter
+- 3 x Rain Bird 100-DV 9V – Irrigation Solenoid Valve, 1 inch
+- 1 x brass reducer: brass connector to the pipe connection with a quick coupling, 33.3 mm (G 1 inch) - AG / 26.5 mm (G 3/4 inch)
+- ECENCE 1 pcs Inline Fuse Holder 12V - Waterproof Fuse Holder | 14AWG, Max. 32V, 20A
+- 5A blade fuses
+- 10m 18 AWG 2 core 0.82 mm²
+- 20m 18 AWG 5 core 0.75mm²
+- 3/4" BSP Thread Low Flow Water Pressure Regulating Valve Farm Drip Irrigation15/20/25/30/45PSI Pressure Reducing Valves(30 PSI)
+- 2-Way Brass Hose Splitter, 3/4" Tap Garden Hose Connector, Y Valve Tap Connector
+- 5 x Digital Temperature and Humidity Sensor for BME280 with I2C
+- 5 x APKLVSR Soil Moisture Sensor, Capacitive Analogue Hygrometer, Moisture Sensor
+- 2 x DollaTek Mini Stepper Motor Drive Controller Board Module L298N Dual H-Bridge DC Stepper for Arduino Smart Car Robot
+- DC 12V to 5V 3A USB C Step Down Converter, Type-C Interface 25W Waterproof Buck Module Power Adapter
+- Irrigation Filter Inline Filter,3/4 Inch Female to Male Thread Y Type Screen Filter
+
+- 100m x 16mm Supply Pipe
+- 100 x Garden Drip Irrigation Micro Water Emitters Drippers -clogging Pressure-compensating Watering Heads with 4-inch Barb Thread Connection for Potted Plants
+- 100 x ERKO Cable Ties Black 200 x 4,8 mm UV Resistant
+- 20 x 16mm Lock Barbed Tee Connector 1/2 Inch
+- 35 x 16mm Barbed Elbow Connector 16x16
+- 16 x 16mm Barbed Inline Valve 16x16
+- 10 x Garden Hose 16mm Plug End
+- 25 x  Galvanised Stainless Steel Fixing Pegs, H150 mm, L25 mm, Diameter 2.9 mm Round Head
+
+# Already have
+- TUOFENG 26AWG Electronics Wire kit, Hook up Wire Kit Flexible Silicone Wire(6 Different Colored 10 Meter spools) 0.13mm²
+- Various Arduino equipment from Elegoo starter kit, soldering kit, etc

@@ -1,0 +1,2 @@
+# Real device credentials — NEVER commit. Use secrets.h.example as the template.
+secrets.h

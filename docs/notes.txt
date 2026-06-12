@@ -1,0 +1,66 @@
+# Notes
+
+A 16mm (3/8") tap is quite narrow. It is perfect for a few pots, but for 9 vegetable beds and a polytunnel, it might struggle to provide enough volume to run all your sprinklers at once.
+The Fix: Since you are using an ESP32, use your code to ensure only one zone runs at a time.
+Zone 1 (Beds): 06:00 to 06:15
+Zone 2 (Polytunnel): 06:15 to 06:30
+Master Valve: Opens for the duration of both.
+
+Make sure your manifold has a drain valve at the lowest point. 
+In November, you can shut off the main tap and let the water drain out so the pipes or solenoids don't crack when the ground freezes!
+
+use conduit for any wires running between the beds
+Waterproofing: Use 3M Scotchlok grease-filled connectors for the outdoor wiring between the valves and the project box. Irish dampness will corrode standard wire nuts in weeks.
+
+Fallback for when AWS/Wi-Fi/API is down: have the ESP32 default to running the schedule rather than skipping it.
+A missed watering in a dry spell is worse than an extra watering in a wet one. (Or vice versa — but decide deliberately.)
+
+Option to switch polarity per valve / Manual valve switch (could be the same thing?)
+
+Option to configure moisture threshold
+
+Battery voltage metric/graph
+
+## 10. Firmware Sequencing Rules (driven by the hardware above)
+
+1. RELAY BEFORE VALVES. On wake: run initValve() (all IN/EN LOW) → set
+   GPIO 41 HIGH → wait ~10ms for relay + L298N to settle → only then pulse a
+   valve. Before sleep: all IN/EN LOW → GPIO 41 LOW → deep sleep. This stops
+   the ESP back-powering an unpowered L298N's logic pins.
+
+2. BOOT CLOSE-PULSE ONLY ON A REAL COLD BOOT. A 15-min deep-sleep timer wake
+   re-runs setup(), but must NOT slam all valves closed (that would interrupt
+   an intended watering). Check esp_reset_reason() / esp_sleep_get_wakeup_cause()
+   and fire the close-all pulse only on a power-on reset, not on a timer/EXT1 wake.
+
+3. BUTTON WAKE. Enable EXT1 wake (ESP_EXT1_WAKEUP_ANY_LOW) on the bitmask of
+   GPIO 13/14/21. On wake, read esp_sleep_get_ext1_wakeup_status() to see which
+   button fired, then toggle that zone's valve.
+
+4. BATTERY READ. analogRead(GPIO 6) once per wake; scale by ×11 (divider).
+   Alerting/health only — no safety action depends on it (fail-closed Layers
+   3 & 4 are not implemented).
+
+5. KNOWN TRADE-OFF (Layers 3 & 4 dropped). On a total power loss the ESP dies
+   immediately; latching valves simply hold their last state until power
+   returns and rule 2 fires the close-all. A valve left open before an outage
+   stays open until then.
+
+# Moisture sensors
+┌──────────┬───────┬───────────────────┐
+│ Constant │ Value │      Meaning      │
+├──────────┼───────┼───────────────────┤
+│ SOIL_DRY │ 3350  │ Bone dry / in air │
+├──────────┼───────┼───────────────────┤
+│ SOIL_WET │ 1300  │ Fully submerged   │
+└──────────┴───────┴───────────────────┘
+Real soil will sit somewhere in between. A rough mapping:
+- ~2800–3350 — very dry, needs water
+- ~2000–2800 — dry, borderline
+- ~1500–2000 — moist, healthy range
+- ~1300–1500 — saturated / waterlogged
+
+
+# Mechanical vent:
+Safety First: Because you are moving a physical arm (the actuator), always include a "Current Monitor" or a software timeout. 
+If the ESP8266 sees the temperature hasn't dropped after "opening," it should send you an SNS alert that the window might be stuck.

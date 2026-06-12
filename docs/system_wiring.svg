@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1060" viewBox="0 0 1560 1060" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#333"/>
+    </marker>
+  </defs>
+  <style>
+    .box  { stroke:#455a64; stroke-width:1.5; rx:8; }
+    .ttl  { font-size:14px; font-weight:700; fill:#102027; }
+    .sub  { font-size:11.5px; fill:#37474f; }
+    .pin  { font-size:11px; fill:#263238; font-family:Consolas,monospace; }
+    .lbl  { font-size:11px; fill:#000; }
+    .net  { fill:none; stroke-width:2.4; marker-end:url(#arrow); }
+    .v12  { stroke:#d32f2f; }   /* +12V        */
+    .vsw  { stroke:#8d4e2a; }   /* switched 12V */
+    .v5   { stroke:#f57c00; }   /* +5V         */
+    .v33  { stroke:#c9a227; }   /* +3.3V       */
+    .gnd  { stroke:#212121; }   /* GND         */
+    .dig  { stroke:#1976d2; }   /* digital GPIO */
+    .i2c  { stroke:#2e7d32; }   /* I2C         */
+    .ana  { stroke:#7b1fa2; }   /* analog      */
+    .coil { stroke:#5d4037; }   /* valve coil out */
+    .dash { stroke-dasharray:5 4; }
+  </style>
+
+  <rect x="0" y="0" width="1560" height="1060" fill="#fbfdff"/>
+  <text x="30" y="36" font-size="22" font-weight="700" fill="#0d47a1">Garden Irrigation — Full System Wiring</text>
+  <text x="30" y="56" class="sub">Solar ESP32-S3 controller · 3 zones (Beds A, Beds B, Polytunnel) · pin-level detail in docs/wiring_diagram.txt §2</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <g>
+    <rect x="1255" y="74" width="280" height="208" class="box" fill="#ffffff"/>
+    <text x="1270" y="95" class="ttl">Wire colour key</text>
+    <line x1="1270" y1="112" x2="1300" y2="112" class="net v12"/>  <text x="1308" y="116" class="lbl">+12 V (battery rail)</text>
+    <line x1="1270" y1="134" x2="1300" y2="134" class="net vsw"/>  <text x="1308" y="138" class="lbl">switched 12 V (via relay)</text>
+    <line x1="1270" y1="156" x2="1300" y2="156" class="net v5"/>   <text x="1308" y="160" class="lbl">+5 V (buck output)</text>
+    <line x1="1270" y1="178" x2="1300" y2="178" class="net v33"/>  <text x="1308" y="182" class="lbl">+3.3 V (ESP output)</text>
+    <line x1="1270" y1="200" x2="1300" y2="200" class="net gnd"/>  <text x="1308" y="204" class="lbl">GND (star-bonded at Wago)</text>
+    <line x1="1270" y1="222" x2="1300" y2="222" class="net dig"/>  <text x="1308" y="226" class="lbl">digital GPIO</text>
+    <line x1="1270" y1="244" x2="1300" y2="244" class="net i2c"/>  <text x="1308" y="248" class="lbl">I²C bus</text>
+    <line x1="1270" y1="266" x2="1300" y2="266" class="net ana"/>  <text x="1308" y="270" class="lbl">analog (soil / battery)</text>
+  </g>
+
+  <!-- ===================== POWER BAND ===================== -->
+  <!-- Solar -->
+  <rect x="30" y="95" width="150" height="52" class="box" fill="#ffe0b2"/>
+  <text x="105" y="118" class="ttl" text-anchor="middle">Solar Panel</text>
+  <text x="105" y="136" class="sub" text-anchor="middle">25 W · 12 V</text>
+
+  <!-- Controller -->
+  <rect x="215" y="80" width="205" height="96" class="box" fill="#ffccbc"/>
+  <text x="317" y="102" class="ttl" text-anchor="middle">Solar Charge Controller</text>
+  <text x="317" y="120" class="sub" text-anchor="middle">10 A · mode = GEL</text>
+  <text x="317" y="140" class="pin" text-anchor="middle">PV   BAT   LOAD</text>
+  <text x="317" y="160" class="sub" text-anchor="middle">loads run off LOAD, not BAT</text>
+
+  <!-- Battery -->
+  <rect x="215" y="205" width="205" height="55" class="box" fill="#ffcdd2"/>
+  <text x="317" y="228" class="ttl" text-anchor="middle">LiFePO₄ 12 V 8 Ah</text>
+  <text x="317" y="246" class="sub" text-anchor="middle">with BMS</text>
+
+  <!-- Fuse -->
+  <rect x="450" y="98" width="105" height="44" class="box" fill="#fff9c4"/>
+  <text x="502" y="118" class="ttl" text-anchor="middle">5 A fuse</text>
+  <text x="502" y="134" class="sub" text-anchor="middle">on LOAD+</text>
+
+  <!-- Wago +12V -->
+  <rect x="590" y="80" width="175" height="66" class="box" fill="#ffcdd2"/>
+  <text x="677" y="103" class="ttl" text-anchor="middle">Wago +12 V</text>
+  <text x="677" y="121" class="sub" text-anchor="middle">distribution block</text>
+  <text x="677" y="138" class="sub" text-anchor="middle">→ buck · relay · divider</text>
+
+  <!-- Wago GND -->
+  <rect x="590" y="172" width="175" height="86" class="box" fill="#cfd8dc"/>
+  <text x="677" y="195" class="ttl" text-anchor="middle">Wago GND</text>
+  <text x="677" y="213" class="sub" text-anchor="middle">star ground point</text>
+  <text x="677" y="231" class="sub" text-anchor="middle">buck · both L298N ·</text>
+  <text x="677" y="248" class="sub" text-anchor="middle">ESP · proto board</text>
+
+  <!-- Buck -->
+  <rect x="590" y="300" width="175" height="62" class="box" fill="#ffe0b2"/>
+  <text x="677" y="323" class="ttl" text-anchor="middle">Buck 12 V→5 V</text>
+  <text x="677" y="343" class="sub" text-anchor="middle">USB-C → ESP32</text>
+
+  <!-- Relay -->
+  <rect x="815" y="78" width="258" height="172" class="box" fill="#d1c4e9"/>
+  <text x="944" y="100" class="ttl" text-anchor="middle">Sleep-cutoff Relay</text>
+  <text x="944" y="118" class="sub" text-anchor="middle">SONGLE (bare), on perfboard</text>
+  <text x="944" y="135" class="sub" text-anchor="middle">PN2222 low-side driver</text>
+  <text x="828" y="160" class="pin">COM ← +12 V</text>
+  <text x="828" y="180" class="pin">NO  → both L298N VCC</text>
+  <text x="828" y="200" class="pin">coil+ ← +5 V (ESP 5V pin)</text>
+  <text x="828" y="220" class="pin">coil− → PN2222 (GPIO 41)</text>
+  <text x="828" y="240" class="pin">1N4007 flyback</text>
+
+  <!-- L298N #1 -->
+  <rect x="1115" y="68" width="210" height="128" class="box" fill="#bbdefb"/>
+  <text x="1220" y="90" class="ttl" text-anchor="middle">L298N #1</text>
+  <text x="1128" y="110" class="pin">VCC ← sw 12 V · GND</text>
+  <text x="1128" y="130" class="pin">Beds A: IN3 IN4 ENB</text>
+  <text x="1128" y="150" class="pin">Beds B: IN1 IN2 ENA</text>
+  <text x="1128" y="172" class="pin">OUT → A &amp; B valves</text>
+
+  <!-- L298N #2 -->
+  <rect x="1115" y="214" width="210" height="106" class="box" fill="#bbdefb"/>
+  <text x="1220" y="236" class="ttl" text-anchor="middle">L298N #2</text>
+  <text x="1128" y="256" class="pin">VCC ← sw 12 V · GND</text>
+  <text x="1128" y="276" class="pin">Poly: IN1 IN2 ENA</text>
+  <text x="1128" y="298" class="pin">OUT → Poly valve</text>
+
+  <!-- Valves -->
+  <rect x="1360" y="72" width="175" height="46" class="box" fill="#c8e6c9"/>
+  <text x="1447" y="92" class="ttl" text-anchor="middle">Beds A valve</text>
+  <text x="1447" y="109" class="sub" text-anchor="middle">Rain Bird latching</text>
+
+  <rect x="1360" y="128" width="175" height="46" class="box" fill="#c8e6c9"/>
+  <text x="1447" y="148" class="ttl" text-anchor="middle">Beds B valve</text>
+  <text x="1447" y="165" class="sub" text-anchor="middle">Rain Bird latching</text>
+
+  <rect x="1360" y="240" width="175" height="46" class="box" fill="#c8e6c9"/>
+  <text x="1447" y="260" class="ttl" text-anchor="middle">Polytunnel valve</text>
+  <text x="1447" y="277" class="sub" text-anchor="middle">Rain Bird latching</text>
+
+  <!-- ===================== POWER CONNECTIONS ===================== -->
+  <path class="net v12"  d="M180,121 L213,121"/>
+  <text x="184" y="113" class="lbl">PV</text>
+  <path class="net v12"  d="M317,176 L317,205"/>
+  <text x="322" y="196" class="lbl">BAT</text>
+  <path class="net v12"  d="M420,121 L448,120"/>
+  <text x="410" y="92" class="lbl">LOAD+</text>
+  <path class="net v12"  d="M555,118 L588,113"/>
+  <path class="net gnd"  d="M420,158 L438,158 L438,210 L588,210"/>
+  <text x="442" y="203" class="lbl">LOAD-</text>
+  <path class="net v12"  d="M677,146 L677,300"/>
+  <text x="682" y="240" class="lbl">+12 V</text>
+  <path class="net v12"  d="M765,100 L813,98"/>
+  <text x="768" y="90" class="lbl">+12 V → COM</text>
+  <path class="net gnd"  d="M640,258 L640,300"/>
+  <path class="net v5"   d="M765,338 L795,338 L795,232 L813,228"/>
+  <text x="772" y="300" class="lbl">+5 V (ESP 5V pin)</text>
+  <path class="net vsw"  d="M1073,98 L1113,94"/>
+  <text x="1076" y="88" class="lbl">sw 12 V</text>
+  <path class="net vsw"  d="M1073,140 L1093,140 L1093,250 L1113,250"/>
+  <path class="net coil" d="M1325,100 L1358,95"/>
+  <text x="1300" y="64" class="lbl">OUT3/4</text>
+  <path class="net coil" d="M1325,150 L1358,150"/>
+  <path class="net coil" d="M1325,266 L1358,263"/>
+
+  <!-- ===================== SIGNAL BAND ===================== -->
+  <!-- ESP -->
+  <rect x="215" y="560" width="375" height="455" class="box" fill="#b3e5fc"/>
+  <text x="402" y="586" class="ttl" text-anchor="middle">ESP32-S3 DevKitC-1</text>
+  <text x="402" y="604" class="sub" text-anchor="middle">on 44-pin screw shield · 15-min deep sleep</text>
+  <line x1="230" y1="616" x2="575" y2="616" stroke="#4fc3f7"/>
+  <text x="232" y="640" class="pin">Soil sensors  : GPIO 1–5   (ADC1)</text>
+  <text x="232" y="664" class="pin">Battery sense : GPIO 6     (ADC1)</text>
+  <text x="232" y="688" class="pin">I²C           : GPIO 8 SDA / 9 SCL</text>
+  <text x="232" y="712" class="pin">Beds A        : GPIO 40, 7, 15</text>
+  <text x="232" y="736" class="pin">Beds B        : GPIO 10, 11, 12</text>
+  <text x="232" y="760" class="pin">Polytunnel    : GPIO 16, 17, 18</text>
+  <text x="232" y="784" class="pin">Zone buttons  : GPIO 13, 14, 21 (wake)</text>
+  <text x="232" y="808" class="pin">Relay control : GPIO 41</text>
+  <text x="232" y="832" class="pin">Status LED    : GPIO 42</text>
+  <text x="232" y="856" class="pin">USB (native)  : GPIO 19, 20</text>
+  <line x1="230" y1="872" x2="575" y2="872" stroke="#4fc3f7"/>
+  <text x="232" y="896" class="pin">5 V in (buck) · 3V3 out · GND → Wago</text>
+  <text x="232" y="922" class="sub">Beds A open on GPIO 40 (moved off 6)</text>
+  <text x="232" y="958" class="sub">Fail-closed: boot close-pulse (Layer 1)</text>
+  <text x="232" y="976" class="sub">Battery ADC alert (Layer 2)</text>
+  <text x="232" y="994" class="sub">Layers 3–4 not fitted</text>
+
+  <!-- Proto board -->
+  <rect x="650" y="560" width="300" height="330" class="box" fill="#fff9c4"/>
+  <text x="800" y="586" class="ttl" text-anchor="middle">Proto / signal board</text>
+  <text x="664" y="616" class="pin">I²C pull-ups  : 4.7k ×2 → 3V3</text>
+  <text x="664" y="644" class="pin">Battery div   : 1M / 100k → GPIO 5</text>
+  <text x="664" y="672" class="pin">Relay re-inv  : PN2222 +1k +2×10k</text>
+  <text x="664" y="700" class="pin">Button pull-up: 10k ×3 → 3V3</text>
+  <text x="664" y="728" class="pin">LED resistor  : 220 Ω</text>
+  <text x="664" y="756" class="pin">Decoupling    : 10µF + 104</text>
+  <text x="664" y="792" class="sub">All small signal-conditioning lives</text>
+  <text x="664" y="810" class="sub">here, inside the IP65 box.</text>
+  <text x="664" y="838" class="sub">104 across BME280 mounts at the</text>
+  <text x="664" y="856" class="sub">sensor (far cable end).</text>
+
+  <!-- Sensors / IO -->
+  <rect x="1010" y="560" width="215" height="66" class="box" fill="#e1bee7"/>
+  <text x="1117" y="583" class="ttl" text-anchor="middle">BME280 (polytunnel)</text>
+  <text x="1117" y="601" class="sub" text-anchor="middle">I²C 0x76 · 50 kHz</text>
+  <text x="1117" y="618" class="sub" text-anchor="middle">5-core cable, shared w/ 1 soil</text>
+
+  <rect x="1010" y="650" width="215" height="66" class="box" fill="#e1bee7"/>
+  <text x="1117" y="675" class="ttl" text-anchor="middle">5× soil moisture</text>
+  <text x="1117" y="694" class="sub" text-anchor="middle">capacitive · AOUT (higher = drier)</text>
+
+  <rect x="1010" y="740" width="215" height="66" class="box" fill="#e1bee7"/>
+  <text x="1117" y="765" class="ttl" text-anchor="middle">3× zone buttons</text>
+  <text x="1117" y="784" class="sub" text-anchor="middle">momentary → GND · wake</text>
+
+  <rect x="1010" y="830" width="215" height="60" class="box" fill="#e1bee7"/>
+  <text x="1117" y="853" class="ttl" text-anchor="middle">Status LED (external)</text>
+  <text x="1117" y="872" class="sub" text-anchor="middle">through-wall, sealed</text>
+
+  <!-- ===================== SIGNAL CONNECTIONS ===================== -->
+  <!-- valve logic buses up to L298Ns -->
+  <path class="net dig" d="M402,560 L402,430 L1180,430 L1180,196"/>
+  <text x="690" y="423" class="lbl">valve logic → L298N #1 (GPIO 7,10,11,12,15,40)</text>
+  <path class="net dig" d="M440,560 L440,452 L1300,452 L1300,320"/>
+  <text x="700" y="445" class="lbl">valve logic → L298N #2 (GPIO 16,17,18)</text>
+
+  <!-- relay control: ESP -> proto -> relay IN -->
+  <path class="net dig" d="M590,805 L620,805 L620,540 L880,540 L880,250"/>
+  <text x="624" y="534" class="lbl">GPIO 41 → re-invert → relay IN</text>
+
+  <!-- I2C ESP->proto->BME -->
+  <path class="net i2c" d="M590,686 L650,686"/>
+  <text x="596" y="680" class="lbl">I²C</text>
+  <path class="net i2c" d="M950,600 L975,600 L975,592 L1008,592"/>
+
+  <!-- 3V3 ESP->proto -->
+  <path class="net v33" d="M590,640 L650,632"/>
+  <text x="596" y="632" class="lbl">3V3</text>
+
+  <!-- 5V buck->ESP -->
+  <path class="net v5" d="M677,362 L677,520 L560,520 L560,560"/>
+  <text x="566" y="514" class="lbl">+5 V</text>
+
+  <!-- GND wago->ESP -->
+  <path class="net gnd" d="M620,258 L620,505 L470,505 L470,560"/>
+  <text x="476" y="500" class="lbl">GND</text>
+
+  <!-- battery divider: +12V -> proto -> GPIO5 -->
+  <path class="net v12 dash" d="M740,146 L740,548 L800,548 L800,560"/>
+  <text x="744" y="500" class="lbl">+12 V → divider</text>
+  <path class="net ana" d="M650,656 L612,656 L612,664 L590,664"/>
+  <text x="556" y="660" class="lbl">→ GPIO 5</text>
+
+  <!-- soil -> ESP analog -->
+  <path class="net ana" d="M1010,690 L980,690 L980,978 L455,978 L455,1015"/>
+  <text x="700" y="972" class="lbl">soil AOUT → GPIO 1–5</text>
+
+  <!-- buttons -> ESP (pull-ups on proto) -->
+  <path class="net dig" d="M1010,775 L990,775 L990,952 L420,952 L420,1015"/>
+  <text x="700" y="946" class="lbl">buttons → GPIO 13/14/21 (10k pull-ups on proto)</text>
+
+  <!-- LED: ESP -> proto(220R) -> LED -->
+  <path class="net dig" d="M590,832 L632,832 L632,860 L650,860"/>
+  <path class="net dig" d="M950,860 L1008,860"/>
+  <text x="956" y="854" class="lbl">220Ω → LED</text>
+
+  <text x="30" y="1045" class="sub">GND note: every module's GND returns to the single Wago GND block (star point). Relay is OFF in deep sleep, isolating both L298N VCC rails to cut quiescent draw.</text>
+</svg>

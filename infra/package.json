@@ -1,0 +1,26 @@
+{
+  "name": "garden-irrigation-infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK infrastructure for the garden irrigation project (eu-west-1)",
+  "bin": {
+    "infra": "bin/garden-irrigation.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --all --profile personal",
+    "diff": "cdk diff --profile personal",
+    "destroy": "cdk destroy --all --profile personal"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "aws-cdk": "^2.160.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.5.4"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0"
+  }
+}

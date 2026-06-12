@@ -1,0 +1,12 @@
+node_modules/
+*.js
+!jest.config.js
+*.d.ts
+cdk.out/
+.cdk.staging/
+cdk.context.json
+*.log
+# device certs/keys must never be committed
+certs/
+*.pem
+*.key

@@ -1,0 +1,456 @@
+# Irrigation System Wiring Diagram
+
+## 1. Power Distribution
+
+The charge controller has THREE terminal groups: PV (panel in), BAT (battery),
+and LOAD (system output). The battery connects only to BAT. System loads are
+powered from LOAD, not directly from the battery.
+
+Charge controller battery mode: set to GEL (not "Sealed/Lithium" — the Gel
+profile has the correct voltage thresholds and no equalisation pulses for LiFePO4).
+
+```
+┌────────────────┐
+│  Solar Panel   │
+│   25W 12V      │
+│  [+]      [-]  │
+└───┬────────┬───┘
+    │ SAE cable (included with panel kit)
+    │        │
+┌───┴────────┴──────────────────────────────────────────────────┐
+│                  Solar Charge Controller (10A)                │
+│                                                               │
+│  [ PV+  PV- ]        [ BAT+  BAT- ]        [ LOAD+  LOAD- ]  │
+└──────────────────────────┬──────┬──────────────┬───────┬──────┘
+                           │      │              │       │
+           ┌───────────────┘      └──────┐        │       │
+           │                            │        │       │
+           │  Connector: F2 female spade │        │       │
+           │  (from spade-to-spade cable │        │       │
+           │   included with battery)   │        │       │
+           │  Spade end → battery tab   │        │       │
+           │  Stripped end → BAT screw  │        │       │
+           ▼                            ▼        │       │
+  ┌──────────────────────┐                       │       │
+  │  LiFePO4 12V 8Ah     │                       │       │
+  │  Battery with BMS    │              18 AWG   │       │ 18 AWG
+  │                      │              red,     │       │ black,
+  │  [+] F2 spade tab ◄──┤              stripped │       │ stripped
+  │  [-] F2 spade tab ◄──┤              both ends│       │ both ends
+  └──────────────────────┘                       │       │
+                                                 ▼       ▼
+                                     ┌──────────────────────┐
+                                     │  5A inline blade fuse │
+                                     │  (waterproof,         │
+                                     │   on LOAD+ wire only) │
+                                     └──────────┬────────────┘
+                                                │
+                                                ▼
+                       ┌──────────────────────────────────────────────┐
+                       │  Wago 221 lever nuts                         │
+                       │  (one block for +12V, one block for GND)     │
+                       │  Insert stripped bare wire — no ring         │
+                       │  terminals, no twisting around rings         │
+                       │                                              │
+                       │  +12V block fans out to:                     │
+                       │    1. Buck converter V+in                    │
+                       │    2. Battery-sense divider top (1MΩ, §9)    │
+                       │    3. Sleep-cutoff relay COM (§9)            │
+                       │       (relay NO feeds BOTH L298N VCCs —      │
+                       │        the L298Ns are NOT fed directly)      │
+                       │                                              │
+                       │  GND block fans out to:                      │
+                       │    1. Buck converter GNDin                   │
+                       │    2. L298N #1 GND                           │
+                       │    3. L298N #2 GND                           │
+                       │    4. ESP32 GND (common reference)           │
+                       │    5. Proto board GND (§9)                   │
+                       └──────────────────────────────────────────────┘
+
+   ┌────────────────────────────────┐
+   │  Buck Converter 12V→5V USB-C   │
+   │  (waterproof)                  │
+   │  V+in  GNDin ── USB-C out ───► │ to ESP32-S3 UART USB-C port
+   └────────────────────────────────┘
+
+   ┌────────────────────────────────────────────────────────┐
+   │  Sleep-Cutoff Relay — SONGLE SRD-05VDC-SL-C (bare)     │
+   │  on the perfboard, driven by a PN2222 low-side switch   │
+   │  (cuts 12V motor power to BOTH L298Ns during deep sleep)│
+   │                                                        │
+   │  Contacts:  COM ◄── +12V (from Wago)                   │
+   │             NO  ──► L298N #1 VCC  +  L298N #2 VCC       │
+   │  Coil:      coil+ → 5V(ESP) · coil− → PN2222 collector  │
+   │             GPIO 47 →[1k]→ base (see §9d for circuit)   │
+   │                                                        │
+   │  GPIO 47 HIGH → relay ON  → 12V reaches the L298Ns     │
+   │  GPIO 47 LOW/sleep/boot → relay OFF → L298Ns isolated  │
+   └────────────────────────────────────────────────────────┘
+
+
+   NOTE: all GNDs must be bonded at the Wago — buck output GND,
+   both L298N GNDs, ESP32 GND, proto board GND. Without a common
+   ground the GPIO → IN signals have no return path and the
+   H-bridges won't switch.
+
+   NOTE: crocodile clips (included in solar kit) are for temporary
+   bench testing only — do not use in the permanent installation.
+   Ring terminals (also included) are for bolt-post battery terminals
+   and do not apply to this battery's F2 spade tabs.
+
+
+   ┌────────────────────────────────┐    ┌────────────────────────────────┐
+   │  L298N H-bridge module #1      │    │  L298N H-bridge module #2      │
+   │                                │    │                                │
+   │  VCC (12V motor, via relay NO) │    │  VCC (12V motor, via relay NO) │
+   │  GND                           │    │  GND                           │
+   │  IN1, IN2, IN3, IN4 (logic)    │    │  IN1, IN2 (logic, ch A only)   │
+   │  ENA jumper REMOVED            │    │  ENA jumper REMOVED            │
+   │  ENB jumper REMOVED            │    │  ENB jumper: doesn't matter    │
+   │  5V Enable jumper ON           │    │  5V Enable jumper ON           │
+   │                                │    │                                │
+   │  OUT1, OUT2 → Beds B valve     │    │  OUT1, OUT2 → Polytunnel valve │
+   │  OUT3, OUT4 → Beds A valve     │    │  OUT3, OUT4 unused             │
+   └────────────────────────────────┘    └────────────────────────────────┘
+       │           │                          │
+       └─ 18 AWG ──┴── outdoor twin-core ─────┘
+              cable runs out to each
+              Rain Bird 100-DV solenoid coil
+```
+
+L298N GND connects to the same Wago GND block as the buck converter.
+Their VCC (12V motor power) is fed via the sleep-cutoff relay NO contact
+(§9) — NOT directly from the +12V block.
+
+NOTE: with "5V Enable jumper ON", each L298N's logic is powered from its
+12V VCC through the onboard regulator. When the relay is de-energised the
+whole module (logic + motor) is off — so firmware must keep all IN/EN pins
+LOW whenever the relay is off, and only drive them after energising the
+relay (see §10).
+
+
+## 2. Signal / Data Side — authoritative pin map
+
+ESP32-S3 DevKitC-1 on 44-pin screw shield.
+Power: 5V from buck · GND bonded to battery GND at the Wago · 3V3 out to sensors.
+
+```
+GPIO  Dir  Function                         Connects to
+────  ───  ───────────────────────────────  ──────────────────────────────────
+  1   AIN  Soil sensor 1   (ADC1)           soil probe 1 AOUT  (cable 1, polytunnel)
+  2   AIN  Soil sensor 2   (ADC1)           soil probe 2 AOUT  (cable 2, bed)
+  3   AIN  Soil sensor 3   (ADC1)           soil probe 3 AOUT  (cable 2, bed)
+  4   AIN  Soil sensor 4   (ADC1)           soil probe 4 AOUT  (cable 3, bed)
+  5   AIN  Soil sensor 5   (ADC1)           soil probe 5 AOUT  (cable 3, bed)
+  6   AIN  Battery voltage sense (ADC1)      divider tap (1MΩ/100kΩ, §9)
+  8   IN   DHT11 DATA  (polytunnel)          DHT11 DATA  (module has onboard pull-up)
+ 10   OUT  Beds B  open    (L298N#1 IN1)     L298N #1 IN1
+ 11   OUT  Beds B  close   (L298N#1 IN2)     L298N #1 IN2
+ 12   OUT  Beds B  enable  (L298N#1 ENA)     L298N #1 ENA
+ 13   IN   Button — Beds A     (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 14   IN   Button — Beds B     (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 16   OUT  Beds A  open    (L298N#1 IN3)     L298N #1 IN3
+ 17   OUT  Beds A  close   (L298N#1 IN4)     L298N #1 IN4   ⚠ UART1 TX default — do not start Serial1
+ 18   OUT  Beds A  enable  (L298N#1 ENB)     L298N #1 ENB   ⚠ UART1 RX default — do not start Serial1
+ 19   —    USB D-  (reserved)                native USB
+ 20   —    USB D+  (reserved)                native USB
+ 21   IN   Button — Polytunnel (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 39   OUT  Polytunnel open  (L298N#2 IN1)    L298N #2 IN1
+ 40   OUT  Polytunnel close (L298N#2 IN2)    L298N #2 IN2
+ 41   OUT  Polytunnel enable (L298N#2 ENA)   L298N #2 ENA
+ 42   OUT  Status LED                        220Ω → external LED → GND (§9)
+ 47   OUT  Relay control                     PN2222 base via 1k (§9)
+```
+
+WHY these pins (so the map is reproducible):
+ - 5 soil + battery = six analog inputs on GPIO 1-6. ONLY ADC1 (GPIO 1-10)
+   reads reliably while WiFi is on.
+ - The DevKitC-1 left header is physically non-sequential. Each valve group
+   is assigned to a physically adjacent triplet:
+     Beds A    (16/17/18) → left  row positions  9/10/11 ✓
+     Beds B    (10/11/12) → left  row positions 16/17/18 ✓
+     Polytunnel (39/40/41)→ right row positions   9/8/7  ✓
+   DHT11 (GPIO 8) sits at left row position 12 — a single wire, isolation fine.
+ - Polytunnel is on the right row because the left row has no free adjacent
+   triplet after Beds A and Beds B are placed. GPIO 39/40/41 are JTAG pins
+   but usable as general-purpose digital outputs in production.
+ - Relay moved to GPIO 47 to free GPIO 41 for the Polytunnel triplet.
+ - Buttons on GPIO 13/14/21 — must be RTC-capable (GPIO 0-21) for EXT1
+   deep-sleep wake. GPIO 0 is strapping/BOOT; not used for a button.
+ - GPIO 17/18 are UART1 TX/RX defaults — safe as digital outputs as long as
+   Serial1 is never started in firmware (it isn't by default).
+
+
+## 3. Each L298N Channel → Solenoid Valve
+
+```
+   ESP32 GPIO ─► IN_x ┐                        ┌─► OUT_x ───┐
+   ESP32 GPIO ─► IN_y ┤  L298N channel         │            │ 18 AWG
+   ESP32 GPIO ─► EN_z ┘  (motor power 12V)     └─► OUT_y ───┤ outdoor
+                                                            │ twin-core
+                                                            ▼
+                                                    Rain Bird 100-DV
+                                                    9V latching solenoid
+
+   Polarity doesn't matter for install — if "open" and "close" are
+   reversed, swap them in firmware (or swap the wires).
+
+   Drive sequence:
+     Open  pulse: IN_x = HIGH, IN_y = LOW,  EN_z = HIGH for ~50ms,
+                  then EN_z = LOW (or both INs LOW)
+     Close pulse: IN_x = LOW,  IN_y = HIGH, EN_z = HIGH for ~50ms,
+                  then EN_z = LOW
+     Idle:        all LOW (zero current; valve holds last state)
+```
+
+
+## 4. Polytunnel Sensor — DHT11 (temperature + humidity)
+
+One DHT11 module in the polytunnel, on GPIO 8. The Elegoo DHT11 module
+(3-pin) has an onboard pull-up resistor — no perfboard pull-up needed.
+
+```
+   ESP32 GPIO 8 ────────────────────────────────► DHT11 DATA
+   ESP32 3V3   ─────────────────────┬──────────► DHT11 VCC
+   ESP32 GND   ──────────────────┬──┼──────────► DHT11 GND
+                                  │  │
+                                  │  │   Cable 1 (polytunnel, 5-core AWG18):
+                                  │  │     core 1 : DATA  (GPIO 8)
+                                  │  │     core 2 : spare
+                                  │  │     core 3 : VCC  (3V3, shared with soil 1)
+                                  │  │     core 4 : GND  (shared with soil 1)
+                                  │  │     core 5 : soil 1 AOUT  (GPIO 1, bypasses perfboard)
+
+   - DHT11 accuracy: ±2°C temperature, ±5% RH humidity.
+   - Readings: once per 15-min wake (DHT11 min sample interval is 1s).
+```
+
+
+## 5. Capacitive Soil Moisture Sensor (×5, one shown)
+
+```
+   3V3 (from perfboard) ─► VCC
+   GND (from perfboard) ─► GND
+   ESP32 ADC pin ◄──────── AOUT (analog 0-3V signal,
+                                 higher = drier)
+
+   Five sensors, each on its own ADC pin (GPIO 1-5 — see §2).
+   AOUT runs straight to the ESP (bypasses the perfboard); VCC/GND come
+   from the perfboard rails. Use ADC1 pins only (GPIO 1-10).
+   Field layout: 1 in the polytunnel (shares cable 1 with the DHT11),
+   2 + 2 on the two bed cables. See docs/perfboard_wiring.svg.
+```
+
+
+## 6. Cable Runs Out of the Enclosure
+
+```
+Inside IP65 enclosure:                Outside (via cable glands):
+
+  Battery, fuse,                       PG7 gland → twin-core to Beds A valve
+  buck converter,                      PG7 gland → twin-core to Beds B valve
+  H-bridges,                           PG7 gland → twin-core to polytunnel valve
+  sleep-cutoff relay,                  PG9 gland → 5-core to polytunnel cluster
+  ESP32 + screw shield,                          (DHT11 + soil sensor share it)
+  proto / signal board (§9),           PG9 gland → 5-core to bed sensor clusters
+  Wagos for power split                PG9 gland → solar charge controller cable
+                                       (battery typically lives in the enclosure if
+                                        it fits; otherwise a second weatherproof box)
+
+  Status LED (§9) mounts THROUGH the enclosure wall — drill a snug 5mm hole,
+  push the LED in from inside, seal with clear silicone / hot-melt around the
+  lens and leads. The lens is the window; keeps it IP65-ish.
+
+  The three zone buttons mount on the enclosure (momentary, normally-open).
+```
+
+
+## 7. Optional / Future Additions
+
+- Inline 3A fuse on the relay→L298N VCC feed
+  (separate from the main 5A; protects against a stuck/shorted solenoid coil)
+
+- P-channel MOSFET high-side switch as a silent, wear-free replacement for the
+  sleep-cutoff relay (no coil current, no contact wear) — a ~£1 part to add on
+  the next order; the relay is the on-hand version.
+
+(Status LED, manual zone buttons and battery-voltage monitoring are now part
+ of the core build — see §2 and §9.)
+
+
+## 8. ESP32-S3 GPIO Notes
+
+- Most ESP32-S3 GPIO are flexible, but the §2 map is now fixed — the analog
+  and RTC constraints below are why.
+- Avoid: GPIO 19/20 (USB), 26-32 (flash), 33-37 (octal PSRAM on this N16R8),
+  GPIO 0 / 45 / 46 (strapping), GPIO 38 (onboard RGB LED, DevKitC-1 v1.1) /
+  GPIO 48 (onboard RGB LED, initial DevKitC-1 — check your board).
+- GPIO 3 is also a strapping pin (JTAG source) but is fine as soil-sensor-3
+  analog input — strapping only matters at boot, not for an ADC read.
+- ADC1: GPIO 1-10 — the only ADC usable with WiFi on. Used for analog: GPIO
+  1-6 (soil + battery). GPIO 8 and 10 are also ADC1-capable but used as
+  digital I/O (DHT11 data, Beds B open); no conflict.
+- ADC2: GPIO 11-20 → conflicts with WiFi; not used for any analog input here.
+- RTC-capable (deep-sleep wake): GPIO 0-21 only. Buttons must live here.
+- GPIO 17/18 are UART1 TX/RX defaults — safe as digital outputs; do not call
+  Serial1.begin() without first reassigning Serial1 pins away from 17/18.
+- GPIO 39/40/41 are JTAG pins (MTCK/MTDO/MTDI) but usable as digital outputs
+  in production. GPIO 42 (MTMS) similarly fine.
+- GPIO 47: relay control. GPIO 48 adjacent — do not confuse the two pins.
+
+
+## 9. Prototype / Signal-Conditioning Board
+
+A single perfboard inside the enclosure carries all the small signal
+conditioning. Suggested zoning (left→right keeps the high-current relay
+contacts away from the analog divider):
+
+```
+  [ DECOUPLING ]     [ BATTERY DIVIDER ]
+   10µF + 104          1MΩ+100kΩ+104
+   at power entry      → GPIO 6
+  [ RELAY + DRIVER ]   [ BUTTON PULL-UPS ]  [ LED ]
+   SONGLE relay +       10k × 3 to 3V3       220Ω
+   PN2222 + 1k + 10k + 1N4007 (low-side)
+
+  Decoupling sits at the far left, right where 3V3/GND enter from the ESP.
+```
+
+Four power rails span the board: +12V (from the Wago), and 3V3 / GND / +5V all
+taken from ESP pins. There is NO separate 5V wire from the buck — the buck's
+only output is the USB-C into the ESP, and the ESP's 5V pin re-exposes that USB
+5V (it feeds the relay coil, the board's only 5V load). Each block taps the
+rails it needs with a short stub (● = junction). See docs/perfboard_wiring.svg.
+
+### 9a. Power-entry decoupling  (enhancement #1)
+```
+   3V3 rail ──┬───────┬──────► to sensors / pull-ups
+              │       │
+            10µF    104 (100nF)      Bulk + HF decoupling at board entry.
+            (electro)               Mind 10µF polarity: stripe = negative → GND.
+              │       │
+   GND  ──────┴───────┴──────►
+```
+### 9b. (reserved)
+
+### 9c. Battery-voltage divider  (fail-closed Layer 2)
+```
+   +12V (Wago) ──[ 1MΩ ]──┬──────────► GPIO 6  (ADC1)
+                          │
+                        [100kΩ]    Vtap = Vbat × 100k/1.1M ≈ Vbat / 11
+                       ∥ [104] ∥   14.6V→1.33V · 12.0V→1.09V · 11.0V→1.00V
+                          │        104 in parallel with 100kΩ stabilises
+   GND ───────────────────┘        the ADC sample/hold. 1 GND connection.
+
+   Always within 0-3.3V → safe. Draw ≈ 11µA (negligible vs sleep budget).
+   Read once per wake; ADC1 so no WiFi-ordering caveat.
+```
+
+### 9d. Sleep-cutoff relay driver  (enhancement #2)
+
+Use the SONGLE SRD-05VDC-SL-C — it's a BARE relay (2 coil pins + 3 contacts
+NO/COM/NC, no onboard transistor/opto), so it solders flat onto the perfboard.
+Drive its coil with one PN2222 as a low-side switch. This is NON-inverting
+(GPIO HIGH = relay ON) and avoids the active-LOW 3.3V turn-off problem that
+the TONGLING module has. Elegoo's tutorial drives this relay with an L293D,
+but that quad half-bridge is overkill — a single transistor + flyback is the
+standard minimal driver. (Keep the TONGLING module as a spare; see §9d-note.)
+
+```
+   +5V (ESP pin) ──┬────────────── coil A
+                   │                    │
+               [1N4007]             [coil]     SONGLE SRD-05VDC-SL-C
+                   │                    │
+                   └──────────── coil B ┘
+                                        │  ← collector
+   GPIO 47 ──[1k]──┬──────────── base ──┤  PN2222 (NPN)
+                 [10k]                  │  ← emitter
+                   │                    │
+   GND ────────────┴────────────────────┘
+
+   Relay CONTACTS (the 3 screw pins):
+     COM ◄── +12V (Wago, post-fuse)        — use heavier wire for the
+     NO  ──► L298N #1 VCC  +  L298N #2 VCC  — 12V load path on the board
+     NC  ── not connected
+
+   GPIO 47 HIGH → NPN saturates → coil energised → relay ON  (12V to L298Ns)
+   GPIO 47 LOW/HiZ → NPN off    → coil off       → relay OFF (L298Ns isolated)
+
+   - The 10k base→GND pull-down keeps the relay OFF at boot and through deep
+     sleep (GPIO 47 is not latched) — no gpio_hold needed.
+   - The bare relay has NO flyback diode (Elegoo relied on the L293D's
+     internal clamps), so the 1N4007 across the coil is REQUIRED. If the board
+     happens to have its own diode, the external one is harmless backup.
+   - Coil ~71mA (5V/70Ω) only while energised — the brief awake window.
+
+9d-note. TONGLING JQC-3FF-S-Z (the complete module: VCC/GND/IN + NO/COM/NC).
+   It has an onboard driver but is ACTIVE-LOW and may not turn off reliably
+   from a 3.3V HIGH, and it doesn't solder flat to perfboard. Kept as a spare.
+   To mount a standalone module neatly: solder a 3-pin female header to the
+   board for VCC/GND/IN and plug the module in via a short Dupont lead, or
+   bolt it to the enclosure with M3 nylon standoffs and run a short ribbon.
+```
+
+### 9e. Zone buttons  (enhancement #3)
+```
+   3V3 ─[10k]─┬──► GPIO 13     button → GND      Beds A
+   3V3 ─[10k]─┬──► GPIO 14     button → GND      Beds B
+   3V3 ─[10k]─┬──► GPIO 21     button → GND      Polytunnel
+              │
+           (each button shorts its GPIO to GND when pressed)
+
+   External 10k pull-ups (not just internal) so the level is defined HIGH
+   during deep sleep, which EXT1 wake needs. One press toggles that zone's
+   latching valve open↔closed.
+```
+
+### 9f. Status LED  (enhancement #4)
+```
+   GPIO 42 ─[220Ω]──►|── GND          ►| = LED, long leg (anode) toward 220Ω.
+                                        Use a red/green/yellow LED (Vf ~2V)
+                                        for good brightness at ~6mA.
+   Drive HIGH = on. Keep LOW in sleep. Mounts through the enclosure wall (§6).
+```
+
+### Proto-board parts (all from the Elegoo kit unless noted)
+```
+  3 × 10k                   button pull-ups
+  1 × 10k                   relay driver base pull-down
+  1 × 1k                    relay driver base resistor
+  1 × 1MΩ + 1 × 100kΩ       battery divider
+  1 × 220Ω                  LED series resistor
+  2 × 104 (100nF) ceramic   1 board entry, 1 battery tap
+  1 × 10µF electrolytic     board-entry bulk decoupling
+  1 × PN2222 (NPN)          relay coil low-side driver
+  1 × 1N4007                relay coil flyback (REQUIRED — bare relay has none)
+  1 × SONGLE relay          SRD-05VDC-SL-C bare relay, solders to the board
+                            (TONGLING JQC-3FF-S-Z kept as a spare module)
+  3 × momentary buttons     zone control
+  1 × LED                   status (red/green/yellow)
+```
+
+
+## 10. Firmware Sequencing Rules (driven by the hardware above)
+
+1. RELAY BEFORE VALVES. On wake: run initValve() (all IN/EN LOW) → set
+   GPIO 47 HIGH → wait ~10ms for relay + L298N to settle → only then pulse a
+   valve. Before sleep: all IN/EN LOW → GPIO 47 LOW → deep sleep. This stops
+   the ESP back-powering an unpowered L298N's logic pins.
+
+2. BOOT CLOSE-PULSE ONLY ON A REAL COLD BOOT. A 15-min deep-sleep timer wake
+   re-runs setup(), but must NOT slam all valves closed (that would interrupt
+   an intended watering). Check esp_reset_reason() / esp_sleep_get_wakeup_cause()
+   and fire the close-all pulse only on a power-on reset, not on a timer/EXT1 wake.
+
+3. BUTTON WAKE. Enable EXT1 wake (ESP_EXT1_WAKEUP_ANY_LOW) on the bitmask of
+   GPIO 13/14/21. On wake, read esp_sleep_get_ext1_wakeup_status() to see which
+   button fired, then toggle that zone's valve.
+
+4. BATTERY READ. analogRead(GPIO 6) once per wake; scale by ×11 (divider).
+   Alerting/health only — no safety action depends on it (fail-closed Layers
+   3 & 4 are not implemented).
+
+5. KNOWN TRADE-OFF (Layers 3 & 4 dropped). On a total power loss the ESP dies
+   immediately; latching valves simply hold their last state until power
+   returns and rule 2 fires the close-all. A valve left open before an outage
+   stays open until then.

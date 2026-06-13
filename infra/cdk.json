@@ -5,7 +5,8 @@
     "exclude": ["README.md", "cdk*.json", "**/*.d.ts", "**/*.js", "node_modules"]
   },
   "context": {
-    "alertEmail": "REPLACE_WITH_YOUR_EMAIL",
+    "alertEmail": "otisliddy@gmail.com",
+    "iotEndpoint": "a1t0rh7vtg6i19-ats.iot.eu-west-1.amazonaws.com",
     "@aws-cdk/core:defaultCrossStackReferences": "both",
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:checkSecretUsage": true,

@@ -2,6 +2,8 @@
 import * as cdk from 'aws-cdk-lib';
 import { DataStack } from '../lib/data-stack';
 import { IotStack } from '../lib/iot-stack';
+import { ApiStack } from '../lib/api-stack';
+import { WebStack } from '../lib/web-stack';
 
 const app = new cdk.App();
 
@@ -13,6 +15,7 @@ const env: cdk.Environment = {
 };
 
 const alertEmail = app.node.tryGetContext('alertEmail') as string | undefined;
+const iotEndpoint = app.node.tryGetContext('iotEndpoint') as string;
 
 const data = new DataStack(app, 'GardenData', { env });
 
@@ -22,3 +25,12 @@ new IotStack(app, 'GardenIot', {
   valveEventsTable: data.valveEventsTable,
   alertEmail,
 });
+
+new ApiStack(app, 'GardenApi', {
+  env,
+  sensorsTable: data.sensorsTable,
+  valveEventsTable: data.valveEventsTable,
+  iotEndpoint,
+});
+
+new WebStack(app, 'GardenWeb', { env });

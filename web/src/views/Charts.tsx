@@ -48,7 +48,7 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const CHART_PROPS = {
-  margin: { top: 8, right: 8, left: -10, bottom: 0 },
+  margin: { top: 8, right: 8, left: 0, bottom: 0 },
 };
 
 const AXIS_STYLE = { fill: '#7fa87f', fontSize: 10, fontFamily: 'IBM Plex Mono' };
@@ -168,10 +168,10 @@ function MoistureChart({ data, range, config }: {
     <div className="chart-wrap">
       <div className="chart-title">Soil ADC (higher = drier)</div>
       <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={rows} {...CHART_PROPS}>
+        <LineChart data={rows} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid {...GRID_PROPS} />
           <XAxis dataKey="ts" tick={AXIS_STYLE} interval="preserveStartEnd" />
-          <YAxis tick={AXIS_STYLE} reversed label={{ value: '← wet  dry →', angle: -90, fill: '#7fa87f', fontSize: 9, dx: -2 }} domain={[800, 3200]} />
+          <YAxis tick={AXIS_STYLE} reversed domain={[800, 3200]} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'IBM Plex Mono' }} />
           <Brush dataKey="ts" height={16} stroke="#2a3f2a" fill="#0d1f0e" travellerWidth={6} />
@@ -198,13 +198,13 @@ function ClimateChart({ data, range }: { data: SensorRow[]; range: Range }) {
 
   return (
     <div className="chart-wrap">
-      <div className="chart-title">Polytunnel — temp & humidity</div>
+      <div className="chart-title">Polytunnel — temp °C (left) · humidity % (right)</div>
       <ResponsiveContainer width="100%" height={240}>
-        <ComposedChart data={rows} {...CHART_PROPS}>
+        <ComposedChart data={rows} margin={{ top: 8, right: 32, left: 4, bottom: 0 }}>
           <CartesianGrid {...GRID_PROPS} />
           <XAxis dataKey="ts" tick={AXIS_STYLE} interval="preserveStartEnd" />
-          <YAxis yAxisId="temp" tick={AXIS_STYLE} domain={['auto','auto']} label={{ value: '°C', angle: -90, fill: '#ffb300', fontSize: 9, dx: -2 }} />
-          <YAxis yAxisId="rh" orientation="right" tick={AXIS_STYLE} domain={[0,100]} label={{ value: '%RH', angle: 90, fill: '#64b5f6', fontSize: 9, dx: 6 }} />
+          <YAxis yAxisId="temp" tick={AXIS_STYLE} domain={['auto','auto']} />
+          <YAxis yAxisId="rh" orientation="right" tick={AXIS_STYLE} domain={[0,100]} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'IBM Plex Mono' }} />
           <Brush dataKey="ts" height={16} stroke="#2a3f2a" fill="#0d1f0e" travellerWidth={6} />
@@ -223,9 +223,33 @@ function ValvesChart({ data, range }: { data: ValveEvent[]; range: Range }) {
 
   const opens = new Map<string, { ts: number; source: string }>();
 
+  // First pass: collect durations in minutes to decide unit
+  const rawDurs = new Map<string, number>(); // key -> minutes
+  opens.clear();
   [...data].sort((a,b) => a.ts - b.ts).forEach(ev => {
     if (!ev.zone) return;
-    const key = `${ev.zone}__${ev.ts}`;
+    if (ev.action === 'open') {
+      opens.set(ev.zone, { ts: ev.ts, source: ev.source ?? 'auto' });
+    } else if (ev.action === 'close') {
+      const open = opens.get(ev.zone);
+      if (open) {
+        const durMin = (ev.ts - open.ts) / 60000;
+        const col = `${ev.zone}_${open.source}`;
+        rawDurs.set(col, (rawDurs.get(col) ?? 0) + durMin);
+        opens.delete(ev.zone);
+      }
+    }
+  });
+  const maxDurMin = Math.max(0, ...[...rawDurs.values()]);
+  const useSeconds = maxDurMin < 2;
+  const toDisplay = (min: number) => useSeconds ? min * 60 : min;
+  const unit = useSeconds ? 'sec' : 'min';
+  const tickFmt = (v: number) => useSeconds ? `${Math.round(v)}s` : `${v.toFixed(1)}m`;
+
+  // Second pass: build rows with display-unit values
+  opens.clear();
+  [...data].sort((a,b) => a.ts - b.ts).forEach(ev => {
+    if (!ev.zone) return;
     if (ev.action === 'open') {
       opens.set(ev.zone, { ts: ev.ts, source: ev.source ?? 'auto' });
     } else if (ev.action === 'close') {
@@ -238,11 +262,10 @@ function ValvesChart({ data, range }: { data: ValveEvent[]; range: Range }) {
         if (!dayMap.has(day)) dayMap.set(day, { day } as DayRow);
         const row = dayMap.get(day)!;
         const col = `${ev.zone}_${open.source}`;
-        row[col] = (row[col] as number ?? 0) + durMin;
+        row[col] = ((row[col] as number) ?? 0) + toDisplay(durMin);
         opens.delete(ev.zone);
       }
     }
-    void key;
   });
 
   const rows = [...dayMap.values()];
@@ -251,19 +274,18 @@ function ValvesChart({ data, range }: { data: ValveEvent[]; range: Range }) {
 
   return (
     <div className="chart-wrap">
-      <div className="chart-title">Valve open duration (min)</div>
+      <div className="chart-title">Valve open duration ({unit})</div>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={rows} {...CHART_PROPS}>
           <CartesianGrid {...GRID_PROPS} />
           <XAxis dataKey="day" tick={AXIS_STYLE} interval="preserveStartEnd" />
-          <YAxis tick={AXIS_STYLE} />
+          <YAxis tick={AXIS_STYLE} tickFormatter={tickFmt} />
           <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'IBM Plex Mono' }} />
           <Brush dataKey="day" height={16} stroke="#2a3f2a" fill="#0d1f0e" travellerWidth={6} />
           {zones.flatMap(z =>
             sources.map(s => (
               <Bar key={`${z}_${s}`} dataKey={`${z}_${s}`} stackId={z}
-                fill={SOURCE_COLORS[s]} name={`${z}/${s}`} />
+                fill={SOURCE_COLORS[s]} name={`${z}/${s}`} legendType="none" />
             ))
           )}
         </BarChart>
@@ -307,44 +329,65 @@ function UsageChart({ data, range }: { data: ValveEvent[]; range: Range }) {
   type DayRow = Record<string, number> & { day: string };
   const dayMap = new Map<string, DayRow>();
 
-  const opens = new Map<string, number>();
+  const rawOpens = new Map<string, number>();
+  const rawDursU = new Map<ZoneName, number>();
 
   [...data].sort((a,b) => a.ts - b.ts).forEach(ev => {
     if (!ev.zone) return;
     if (ev.action === 'open') {
-      opens.set(ev.zone, ev.ts);
+      rawOpens.set(ev.zone, ev.ts);
     } else if (ev.action === 'close') {
-      const openTs = opens.get(ev.zone);
+      const openTs = rawOpens.get(ev.zone);
       if (openTs != null) {
-        const durMin = (ev.ts - openTs) / 60000;
+        rawDursU.set(ev.zone, (rawDursU.get(ev.zone) ?? 0) + (ev.ts - openTs) / 60000);
+        rawOpens.delete(ev.zone);
+      }
+    }
+  });
+
+  const maxDurMin = Math.max(0, ...[...rawDursU.values()]);
+  const useSeconds = maxDurMin < 2;
+  const toDisplay = (min: number) => useSeconds ? min * 60 : min;
+  const unit = useSeconds ? 'sec' : 'min';
+  const tickFmt = (v: number) => useSeconds ? `${Math.round(v)}s` : `${v.toFixed(1)}m`;
+
+  const opens2 = new Map<string, number>();
+  [...data].sort((a,b) => a.ts - b.ts).forEach(ev => {
+    if (!ev.zone) return;
+    if (ev.action === 'open') {
+      opens2.set(ev.zone, ev.ts);
+    } else if (ev.action === 'close') {
+      const openTs = opens2.get(ev.zone);
+      if (openTs != null) {
+        const dur = toDisplay((ev.ts - openTs) / 60000);
         const day = range === '6h' || range === '24h'
           ? fmtTs(ev.ts, range)
           : dayKey(ev.ts);
         if (!dayMap.has(day)) dayMap.set(day, { day } as DayRow);
         const row = dayMap.get(day)!;
-        row[ev.zone] = (row[ev.zone] as number ?? 0) + durMin;
-        opens.delete(ev.zone);
+        row[ev.zone] = ((row[ev.zone] as number) ?? 0) + dur;
+        opens2.delete(ev.zone);
       }
     }
   });
 
   const rows = [...dayMap.values()];
   const zones: ZoneName[] = ['bedsA', 'bedsB', 'polytunnel'];
+  const zoneLabels: Record<ZoneName, string> = { bedsA: 'Beds A', bedsB: 'Beds B', polytunnel: 'Polytunnel' };
 
   return (
     <div className="chart-wrap">
-      <div className="chart-title">Watering time per zone (min / day)</div>
+      <div className="chart-title">Watering time per zone ({unit} / period)</div>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={rows} {...CHART_PROPS}>
           <CartesianGrid {...GRID_PROPS} />
           <XAxis dataKey="day" tick={AXIS_STYLE} interval="preserveStartEnd" />
-          <YAxis tick={AXIS_STYLE} unit=" m" />
+          <YAxis tick={AXIS_STYLE} tickFormatter={tickFmt} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'IBM Plex Mono' }} />
           <Brush dataKey="day" height={16} stroke="#2a3f2a" fill="#0d1f0e" travellerWidth={6} />
           {zones.map(z => (
-            <Bar key={z} dataKey={z} fill={ZONE_COLORS[z]}
-              name={z === 'bedsA' ? 'Beds A' : z === 'bedsB' ? 'Beds B' : 'Polytunnel'} />
+            <Bar key={z} dataKey={z} fill={ZONE_COLORS[z]} name={zoneLabels[z]} />
           ))}
         </BarChart>
       </ResponsiveContainer>

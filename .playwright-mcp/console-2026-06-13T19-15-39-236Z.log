@@ -1,0 +1,4 @@
+[      60ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ https://d2rg4myx80f9ai.cloudfront.net/:0
+[     375ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://d2rg4myx80f9ai.cloudfront.net/favicon.ico:0
+[     375ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://d2rg4myx80f9ai.cloudfront.net/icon-192.png:0
+[     376ms] [WARNING] Error while trying to use the following icon from the Manifest: https://d2rg4myx80f9ai.cloudfront.net/icon-192.png (Download error or resource isn't a valid image) @ https://d2rg4myx80f9ai.cloudfront.net/:0

@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e7]: connecting…
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e11]: Beds A
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - generic [ref=e15]: A1
+              - generic [ref=e18]: —
+            - generic [ref=e19]:
+              - generic [ref=e20]: A2
+              - generic [ref=e23]: —
+          - generic [ref=e24]:
+            - button "Open valve" [ref=e25] [cursor=pointer]
+            - button "Skip next auto" [ref=e26] [cursor=pointer]
+        - generic [ref=e27]:
+          - generic [ref=e29]: Beds B
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: B1
+              - generic [ref=e36]: —
+            - generic [ref=e37]:
+              - generic [ref=e38]: B2
+              - generic [ref=e41]: —
+          - generic [ref=e42]:
+            - button "Open valve" [ref=e43] [cursor=pointer]
+            - button "Skip next auto" [ref=e44] [cursor=pointer]
+        - generic [ref=e45]:
+          - generic [ref=e47]: Polytunnel
+          - generic [ref=e50]:
+            - generic [ref=e51]: P
+            - generic [ref=e54]: —
+          - generic [ref=e55]:
+            - button "Open valve" [ref=e56] [cursor=pointer]
+            - button "Skip next auto" [ref=e57] [cursor=pointer]
+  - navigation [ref=e58]:
+    - button "🌿 Garden" [ref=e59] [cursor=pointer]:
+      - generic [ref=e60]: 🌿
+      - generic [ref=e61]: Garden
+    - button "📊 Charts" [ref=e62] [cursor=pointer]:
+      - generic [ref=e63]: 📊
+      - generic [ref=e64]: Charts
+    - button "⚙️ Settings" [ref=e65] [cursor=pointer]:
+      - generic [ref=e66]: ⚙️
+      - generic [ref=e67]: Settings

@@ -250,7 +250,7 @@ void ledDoubleBlip() {                    // button-press acknowledgement
 // ===================== Cloud publish =====================
 void publishValveEvent(int z, const char* action, const char* source, uint32_t durSec) {
   if (!mqttReady) return;
-  StaticJsonDocument<192> doc;
+  JsonDocument doc;
   doc["zone"]   = zoneKey[z];
   doc["action"] = action;
   doc["source"] = source;
@@ -262,7 +262,7 @@ void publishValveEvent(int z, const char* action, const char* source, uint32_t d
 
 void publishTelemetry() {
   if (!mqttReady) return;
-  StaticJsonDocument<320> doc;
+  JsonDocument doc;
   doc["soilPoly"] = readSoilPin(PIN_SOIL_POLY);
   doc["soilA1"]   = readSoilPin(PIN_SOIL_A1);
   doc["soilA2"]   = readSoilPin(PIN_SOIL_A2);
@@ -281,7 +281,7 @@ void publishTelemetry() {
 void publishStatus(const char* mode) {
   if (!mqttReady) return;
   const float vb = readBatt();
-  StaticJsonDocument<192> doc;
+  JsonDocument doc;
   doc["mode"]    = mode;
   doc["battV"]   = vb;
   doc["battLow"] = vb < cfg.battLowV;       // health rule alerts on this
@@ -296,7 +296,7 @@ void publishStatus(const char* mode) {
 // what the device actually applied.
 void reportShadow() {
   if (!mqttReady) return;
-  DynamicJsonDocument doc(2048);
+  JsonDocument doc;
   JsonObject rep = doc["state"].createNestedObject("reported");
   JsonObject c  = rep.createNestedObject("config");
   JsonObject st = c.createNestedObject("soilThreshold");
@@ -367,7 +367,7 @@ void applyDesired(JsonVariantConst d) {
 }
 
 void onMqttMessage(char* topic, byte* payload, unsigned int len) {
-  DynamicJsonDocument doc(4096);
+  JsonDocument doc;
   if (deserializeJson(doc, payload, len)) return;          // ignore malformed
   if (strstr(topic, "/get/accepted"))      applyDesired(doc["state"]["desired"]);
   else if (strstr(topic, "/update/delta")) applyDesired(doc["state"]);

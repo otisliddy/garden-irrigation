@@ -1,0 +1,9 @@
+# Local tooling (arduino-cli.exe lives here)
+bin/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Note: infra/, web/, and arduino/ have their own .gitignore for
+# node_modules, build output, device certs, and secrets.h.

@@ -1,0 +1,82 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - button "Moisture" [ref=e182] [cursor=pointer]
+          - button "Climate" [ref=e183] [cursor=pointer]
+          - button "Valves" [active] [ref=e184] [cursor=pointer]
+          - button "Battery" [ref=e185] [cursor=pointer]
+          - button "Usage" [ref=e186] [cursor=pointer]
+        - generic [ref=e187]:
+          - button "6h" [ref=e188] [cursor=pointer]
+          - button "24h" [ref=e189] [cursor=pointer]
+          - button "7d" [ref=e190] [cursor=pointer]
+          - button "30d" [ref=e191] [cursor=pointer]
+        - generic [ref=e335]:
+          - generic [ref=e336]: Valve open duration (min)
+          - generic [ref=e338]:
+            - img [ref=e339]:
+              - generic [ref=e346]: 19:34
+              - generic [ref=e348]:
+                - generic [ref=e350]: "0"
+                - generic [ref=e352]: "0.01"
+                - generic [ref=e354]: "0.02"
+                - generic [ref=e356]: "0.03"
+                - generic [ref=e358]: "0.04"
+              - generic [ref=e359]:
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e361]'
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e363]'
+            - list [ref=e371]:
+              - listitem [ref=e372]:
+                - img [ref=e373]
+                - text: bedsA/auto
+              - listitem [ref=e375]:
+                - img [ref=e376]
+                - text: bedsA/manual
+              - listitem [ref=e378]:
+                - img [ref=e379]
+                - text: bedsA/override
+              - listitem [ref=e381]:
+                - img [ref=e382]
+                - text: bedsA/failclose
+              - listitem [ref=e384]:
+                - img [ref=e385]
+                - text: bedsB/auto
+              - listitem [ref=e387]:
+                - img [ref=e388]
+                - text: bedsB/manual
+              - listitem [ref=e390]:
+                - img [ref=e391]
+                - text: bedsB/override
+              - listitem [ref=e393]:
+                - img [ref=e394]
+                - text: bedsB/failclose
+              - listitem [ref=e396]:
+                - img [ref=e397]
+                - text: polytunnel/auto
+              - listitem [ref=e399]:
+                - img [ref=e400]
+                - text: polytunnel/manual
+              - listitem [ref=e402]:
+                - img [ref=e403]
+                - text: polytunnel/override
+              - listitem [ref=e405]:
+                - img [ref=e406]
+                - text: polytunnel/failclose
+          - generic [ref=e408]:
+            - generic [ref=e409]: ■ auto
+            - generic [ref=e410]: ■ manual
+            - generic [ref=e411]: ■ override
+            - generic [ref=e412]: ■ failclose
+    - navigation [ref=e58]:
+      - button "🌿 Garden" [ref=e59] [cursor=pointer]:
+        - generic [ref=e60]: 🌿
+        - generic [ref=e61]: Garden
+      - button "📊 Charts" [ref=e62] [cursor=pointer]:
+        - generic [ref=e63]: 📊
+        - generic [ref=e64]: Charts
+      - button "⚙️ Settings" [ref=e65] [cursor=pointer]:
+        - generic [ref=e66]: ⚙️
+        - generic [ref=e67]: Settings
+  - generic [ref=e263]: "0.01"

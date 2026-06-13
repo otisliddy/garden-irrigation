@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { DeviceStatus, Weather, SensorRow, Config, ZoneName } from '../api';
 import { api } from '../api';
 import ZoneCard from '../components/ZoneCard';
@@ -33,14 +33,35 @@ const ZONES: { zone: ZoneName; label: string; keys: string[]; sensorFields: (key
 
 export default function Dashboard({ status, weather, latestSensor, config }: Props) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [pendingOpen, setPendingOpen] = useState<Partial<Record<ZoneName, boolean>>>({});
+
+  // Clear pending state once the device shadow confirms the expected valve state
+  useEffect(() => {
+    if (!status?.valve) return;
+    setPendingOpen(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const z of Object.keys(next) as ZoneName[]) {
+        if (status.valve![z]?.open === next[z]) {
+          delete next[z];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [status]);
 
   const pct = battPct(status?.battV ?? null);
   const col = battColor(pct);
 
   async function toggle(zone: ZoneName, open: boolean) {
     setLoading(l => ({ ...l, [zone]: true }));
-    try { await api.zoneSet(zone, open); }
-    finally { setLoading(l => ({ ...l, [zone]: false })); }
+    try {
+      await api.zoneSet(zone, open);
+      setPendingOpen(p => ({ ...p, [zone]: open }));
+    } finally {
+      setLoading(l => ({ ...l, [zone]: false }));
+    }
   }
 
   async function skipNext(zone: ZoneName) {
@@ -80,20 +101,26 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
 
       {/* Zone cards */}
       <div className="zone-grid">
-        {ZONES.map(({ zone, label, keys, sensorFields }) => (
-          <ZoneCard
-            key={zone}
-            label={label}
-            isOpen={status?.valve?.[zone]?.open ?? false}
-            soilKeys={keys}
-            soilValues={sensorFields.map(f => latestSensor?.[f] as number | null ?? null)}
-            soilThreshold={config?.soilThreshold?.[zone] ?? 2800}
-            onOpen={() => toggle(zone, true)}
-            onClose={() => toggle(zone, false)}
-            onSkipNext={() => skipNext(zone)}
-            loading={loading[zone] ?? false}
-          />
-        ))}
+        {ZONES.map(({ zone, label, keys, sensorFields }) => {
+          const confirmedOpen = status?.valve?.[zone]?.open ?? false;
+          const isPending = zone in pendingOpen;
+          const isOpen = isPending ? pendingOpen[zone]! : confirmedOpen;
+          return (
+            <ZoneCard
+              key={zone}
+              label={label}
+              isOpen={isOpen}
+              isPending={isPending}
+              soilKeys={keys}
+              soilValues={sensorFields.map(f => latestSensor?.[f] as number | null ?? null)}
+              soilThreshold={config?.soilThreshold?.[zone] ?? 2800}
+              onOpen={() => toggle(zone, true)}
+              onClose={() => toggle(zone, false)}
+              onSkipNext={() => skipNext(zone)}
+              loading={loading[zone] ?? false}
+            />
+          );
+        })}
       </div>
 
       {/* Weather */}

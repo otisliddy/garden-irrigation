@@ -1,6 +1,7 @@
 interface Props {
   label: string;
   isOpen: boolean;
+  isPending?: boolean;
   soilKeys: string[];
   soilValues: (number | null)[];
   soilThreshold: number;
@@ -26,7 +27,7 @@ function soilColor(pct: number): string {
 }
 
 export default function ZoneCard({
-  label, isOpen, soilKeys, soilValues,
+  label, isOpen, isPending, soilKeys, soilValues,
   soilThreshold,
   onOpen, onClose, onSkipNext, loading,
 }: Props) {
@@ -36,6 +37,7 @@ export default function ZoneCard({
     <div className={`zone-card${isOpen ? ' open' : ''}`}>
       <div className="zone-header">
         <span className="zone-name">{label}</span>
+        {isPending && <span className="zone-pending">pending</span>}
         <span className={`zone-dot${isOpen ? ' open' : ''}`} />
       </div>
 

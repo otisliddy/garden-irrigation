@@ -1,0 +1,50 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - button "Moisture" [ref=e182] [cursor=pointer]
+          - button "Climate" [ref=e183] [cursor=pointer]
+          - button "Valves" [ref=e184] [cursor=pointer]
+          - button "Battery" [ref=e185] [cursor=pointer]
+          - button "Usage" [active] [ref=e186] [cursor=pointer]
+        - generic [ref=e187]:
+          - button "6h" [ref=e188] [cursor=pointer]
+          - button "24h" [ref=e189] [cursor=pointer]
+          - button "7d" [ref=e190] [cursor=pointer]
+          - button "30d" [ref=e191] [cursor=pointer]
+        - generic [ref=e460]:
+          - generic [ref=e461]: Watering time per zone (min / day)
+          - generic [ref=e463]:
+            - img [ref=e464]:
+              - generic [ref=e471]: 19:34
+              - generic [ref=e473]:
+                - generic [ref=e475]: 0 m
+                - generic [ref=e477]: 0.01 m
+                - generic [ref=e479]: 0.02 m
+                - generic [ref=e481]: 0.03 m
+                - generic [ref=e483]: 0.04 m
+              - generic [ref=e484]:
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e486]'
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e488]'
+            - list [ref=e496]:
+              - listitem [ref=e497]:
+                - img [ref=e498]
+                - text: Beds A
+              - listitem [ref=e500]:
+                - img [ref=e501]
+                - text: Beds B
+              - listitem [ref=e503]:
+                - img [ref=e504]
+                - text: Polytunnel
+    - navigation [ref=e58]:
+      - button "🌿 Garden" [ref=e59] [cursor=pointer]:
+        - generic [ref=e60]: 🌿
+        - generic [ref=e61]: Garden
+      - button "📊 Charts" [ref=e62] [cursor=pointer]:
+        - generic [ref=e63]: 📊
+        - generic [ref=e64]: Charts
+      - button "⚙️ Settings" [ref=e65] [cursor=pointer]:
+        - generic [ref=e66]: ⚙️
+        - generic [ref=e67]: Settings
+  - generic [ref=e263]: m

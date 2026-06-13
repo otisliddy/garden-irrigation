@@ -1,0 +1,64 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - button "Moisture" [ref=e183] [cursor=pointer]
+          - button "Climate" [ref=e184] [cursor=pointer]
+          - button "Valves" [ref=e185] [cursor=pointer]
+          - button "Battery" [ref=e186] [cursor=pointer]
+          - button "Usage" [ref=e187] [cursor=pointer]
+        - generic [ref=e188]:
+          - button "6h" [ref=e189] [cursor=pointer]
+          - button "24h" [ref=e190] [cursor=pointer]
+          - button "7d" [ref=e191] [cursor=pointer]
+          - button "30d" [ref=e192] [cursor=pointer]
+        - generic [ref=e193]:
+          - generic [ref=e194]: Soil ADC (higher = drier)
+          - generic [ref=e196]:
+            - img [ref=e197]:
+              - generic [ref=e202]:
+                - generic [ref=e204]: 19:16
+                - generic [ref=e206]: 19:18
+                - generic [ref=e208]: 19:33
+                - generic [ref=e210]: 19:48
+                - generic [ref=e212]: 20:03
+              - generic [ref=e214]:
+                - generic [ref=e216]: "800"
+                - generic [ref=e218]: "1400"
+                - generic [ref=e220]: "2000"
+                - generic [ref=e222]: "2600"
+                - generic [ref=e224]: "3200"
+              - generic [ref=e225]:
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e228]'
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e230]'
+              - generic [ref=e233]: A thresh
+              - generic [ref=e235]: B thresh
+              - generic [ref=e237]: P thresh
+            - list [ref=e249]:
+              - listitem [ref=e250]:
+                - img [ref=e251]
+                - text: A1
+              - listitem [ref=e253]:
+                - img [ref=e254]
+                - text: A2
+              - listitem [ref=e256]:
+                - img [ref=e257]
+                - text: B1
+              - listitem [ref=e259]:
+                - img [ref=e260]
+                - text: B2
+              - listitem [ref=e262]:
+                - img [ref=e263]
+                - text: Poly
+    - navigation [ref=e58]:
+      - button "🌿 Garden" [ref=e59] [cursor=pointer]:
+        - generic [ref=e60]: 🌿
+        - generic [ref=e61]: Garden
+      - button "📊 Charts" [active] [ref=e62] [cursor=pointer]:
+        - generic [ref=e63]: 📊
+        - generic [ref=e64]: Charts
+      - button "⚙️ Settings" [ref=e65] [cursor=pointer]:
+        - generic [ref=e66]: ⚙️
+        - generic [ref=e67]: Settings
+  - generic [ref=e265]: "800"

@@ -1,0 +1,61 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - button "Moisture" [ref=e182] [cursor=pointer]
+          - button "Climate" [active] [ref=e183] [cursor=pointer]
+          - button "Valves" [ref=e184] [cursor=pointer]
+          - button "Battery" [ref=e185] [cursor=pointer]
+          - button "Usage" [ref=e186] [cursor=pointer]
+        - generic [ref=e187]:
+          - button "6h" [ref=e188] [cursor=pointer]
+          - button "24h" [ref=e189] [cursor=pointer]
+          - button "7d" [ref=e190] [cursor=pointer]
+          - button "30d" [ref=e191] [cursor=pointer]
+        - generic [ref=e264]:
+          - generic [ref=e265]: Polytunnel — temp & humidity
+          - generic [ref=e267]:
+            - img [ref=e268]:
+              - generic [ref=e273]:
+                - generic [ref=e275]: 19:16
+                - generic [ref=e277]: 19:18
+                - generic [ref=e279]: 19:33
+                - generic [ref=e281]: 19:48
+              - generic [ref=e282]:
+                - generic [ref=e283]:
+                  - generic [ref=e285]: "19"
+                  - generic [ref=e287]: "19.2"
+                  - generic [ref=e289]: "19.4"
+                  - generic [ref=e291]: "19.6"
+                  - generic [ref=e293]: "19.8"
+                - generic [ref=e294]: °C
+              - generic [ref=e295]:
+                - generic [ref=e296]:
+                  - generic [ref=e298]: "0"
+                  - generic [ref=e300]: "25"
+                  - generic [ref=e302]: "50"
+                  - generic [ref=e304]: "75"
+                  - generic [ref=e306]: "100"
+                - generic [ref=e307]: "%RH"
+              - generic [ref=e308]:
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e311]'
+                - 'slider "Min value: undefined, Max value: undefined" [ref=e313]'
+            - list [ref=e324]:
+              - listitem [ref=e325]:
+                - img [ref=e326]
+                - text: RH %
+              - listitem [ref=e328]:
+                - img [ref=e329]
+                - text: Temp °C
+    - navigation [ref=e58]:
+      - button "🌿 Garden" [ref=e59] [cursor=pointer]:
+        - generic [ref=e60]: 🌿
+        - generic [ref=e61]: Garden
+      - button "📊 Charts" [ref=e62] [cursor=pointer]:
+        - generic [ref=e63]: 📊
+        - generic [ref=e64]: Charts
+      - button "⚙️ Settings" [ref=e65] [cursor=pointer]:
+        - generic [ref=e66]: ⚙️
+        - generic [ref=e67]: Settings
+  - generic [ref=e263]: "0"

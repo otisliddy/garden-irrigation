@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import type { Config } from '../api';
 
+const ADC_WET = 1300;
+const ADC_DRY = 3350;
+function adcToPct(adc: number): number {
+  return Math.round(Math.max(0, Math.min(100, (ADC_DRY - adc) / (ADC_DRY - ADC_WET) * 100)));
+}
+function pctToAdc(pct: number): number {
+  return Math.round(ADC_DRY - Math.max(0, Math.min(100, pct)) / 100 * (ADC_DRY - ADC_WET));
+}
+
 interface Props {
   config: Config | null;
   onSave: (cfg: Partial<Config>) => Promise<void>;
@@ -41,6 +50,11 @@ export default function Settings({ config, onSave }: Props) {
     return obj?.toString() ?? '';
   }
 
+  function valAsPct(path: string[]): string {
+    const raw = parseFloat(val(path));
+    return isNaN(raw) ? '' : adcToPct(raw).toString();
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -65,31 +79,37 @@ export default function Settings({ config, onSave }: Props) {
     <div className="settings-view">
       {/* Per-zone thresholds */}
       <div className="settings-section">
-        <div className="settings-heading">Soil thresholds (ADC, higher = drier)</div>
+        <div className="settings-heading">Soil thresholds (0 = dry, 100 = wet)</div>
         {zones.map(z => (
           <div key={z}>
             <div className="settings-row">
               <div>
                 <div className="s-label">{zoneLabels[z]} — start</div>
-                <div className="s-sub">water when above this</div>
+                <div className="s-sub">start watering below this %</div>
               </div>
               <input
                 className="s-input"
-                type="number"
-                value={val(['soilThreshold', z])}
-                onChange={e => setNum(['soilThreshold', z], e.target.value)}
+                type="number" min="0" max="100"
+                value={valAsPct(['soilThreshold', z])}
+                onChange={e => {
+                  const pct = parseFloat(e.target.value);
+                  if (!isNaN(pct)) setNum(['soilThreshold', z], pctToAdc(pct).toString());
+                }}
               />
             </div>
             <div className="settings-row">
               <div>
                 <div className="s-label">{zoneLabels[z]} — stop</div>
-                <div className="s-sub">stop when below this</div>
+                <div className="s-sub">stop watering above this %</div>
               </div>
               <input
                 className="s-input"
-                type="number"
-                value={val(['soilStop', z])}
-                onChange={e => setNum(['soilStop', z], e.target.value)}
+                type="number" min="0" max="100"
+                value={valAsPct(['soilStop', z])}
+                onChange={e => {
+                  const pct = parseFloat(e.target.value);
+                  if (!isNaN(pct)) setNum(['soilStop', z], pctToAdc(pct).toString());
+                }}
               />
             </div>
           </div>

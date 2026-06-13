@@ -5,9 +5,9 @@ interface Props {
   soilKeys: string[];
   soilValues: (number | null)[];
   soilThreshold: number;
+  tempC?: number | null;
   onOpen: () => void;
   onClose: () => void;
-  onSkipNext: () => void;
   loading: boolean;
 }
 
@@ -28,8 +28,8 @@ function soilColor(pct: number): string {
 
 export default function ZoneCard({
   label, isOpen, isPending, soilKeys, soilValues,
-  soilThreshold,
-  onOpen, onClose, onSkipNext, loading,
+  soilThreshold, tempC,
+  onOpen, onClose, loading,
 }: Props) {
   const threshPct = wetPct(soilThreshold); // marker: water below this moisture level
 
@@ -67,15 +67,19 @@ export default function ZoneCard({
         })}
       </div>
 
+      {tempC != null && (
+        <div className="temp-row">
+          <span className="temp-label">Temp</span>
+          <span className="temp-val">{tempC.toFixed(1)}°C</span>
+        </div>
+      )}
+
       <div className="zone-actions">
         <button
           className={`btn-toggle ${isOpen ? 'open-state' : 'closed'}`}
           onClick={isOpen ? onClose : onOpen}
         >
           {isOpen ? 'Close valve' : 'Open valve'}
-        </button>
-        <button className="btn-skip" onClick={onSkipNext}>
-          Skip next auto
         </button>
       </div>
 

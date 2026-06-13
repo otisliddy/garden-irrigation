@@ -64,12 +64,6 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
     }
   }
 
-  async function skipNext(zone: ZoneName) {
-    setLoading(l => ({ ...l, [`sk_${zone}`]: true }));
-    try { await api.zoneSkipNext(zone); }
-    finally { setLoading(l => ({ ...l, [`sk_${zone}`]: false })); }
-  }
-
   return (
     <div>
       {/* Status banner */}
@@ -113,9 +107,9 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
               soilKeys={keys}
               soilValues={sensorFields.map(f => latestSensor?.[f] as number | null ?? null)}
               soilThreshold={config?.soilThreshold?.[zone] ?? 2800}
+              tempC={zone === 'polytunnel' ? (latestSensor?.tempC ?? null) : undefined}
               onOpen={() => toggle(zone, true)}
               onClose={() => toggle(zone, false)}
-              onSkipNext={() => skipNext(zone)}
               loading={loading[zone] ?? false}
             />
           );

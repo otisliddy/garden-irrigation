@@ -21,7 +21,28 @@ export default defineConfig({
           { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'] },
+      workbox: {
+        // Hashed assets are safe to precache; index.html is NOT — precaching it
+        // serves a stale shell that points at old JS until the SW races a reload.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            // Always fetch the freshest index.html when online; fall back to the
+            // last-seen copy only when the network is unavailable.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-shell',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 1 },
+            },
+          },
+        ],
+      },
     }),
   ],
   build: { outDir: 'dist' },

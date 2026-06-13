@@ -152,6 +152,8 @@ html, body {
   position: relative;
   overflow: hidden;
   transition: border-color 0.3s, box-shadow 0.3s;
+  display: flex;
+  flex-direction: column;
 }
 
 .zone-card.open { border-color: rgba(105,240,174,0.32); box-shadow: var(--open-glow); }
@@ -216,7 +218,7 @@ html, body {
 .temp-val   { color: var(--text); font-size: 13px; }
 
 /* ── Zone action buttons ── */
-.zone-actions { display: flex; flex-direction: column; gap: 6px; }
+.zone-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 
 .btn-toggle {
   width: 100%; padding: 9px;

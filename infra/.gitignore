@@ -1,6 +1,9 @@
 node_modules/
 *.js
 !jest.config.js
+# Lambda handlers are hand-written JS source (Node runtime, no bundling), not
+# compiled CDK output — they must be tracked.
+!lambda/**/*.js
 *.d.ts
 cdk.out/
 .cdk.staging/

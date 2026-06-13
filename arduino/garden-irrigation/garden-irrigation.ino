@@ -317,7 +317,20 @@ void reportShadow() {
   rep["rainSkip"]      = rainSkip;
   rep["fw"]            = FW_VERSION;
   rep["lastSeenEpoch"] = (uint32_t)time(nullptr);
-  char buf[2048];
+
+  // Clear desired.valve for zones not under an active web override so expired
+  // shadow commands don't re-trigger on the next shadowSync.
+  JsonObject des = doc["state"].createNestedObject("desired");
+  JsonObject dv  = des.createNestedObject("valve");
+  for (int z = 0; z < ZONE_COUNT; z++) {
+    if (!ovrActive[z] || ovrSource[z] != 1) {
+      JsonObject zo = dv.createNestedObject(zoneKey[z]);
+      zo["open"]       = false;
+      zo["untilEpoch"] = 0;
+    }
+  }
+
+  char buf[2560];
   serializeJson(doc, buf, sizeof(buf));
   mqtt.publish(SHADOW_UPDATE, buf);
 }
@@ -347,6 +360,8 @@ void applyDesired(JsonVariantConst d) {
 
   JsonVariantConst v = d["valve"];
   if (!v.isNull()) {
+    const uint64_t nowUnix = (uint64_t)time(nullptr);
+    const bool clockOk = nowUnix > 1700000000ULL;  // SNTP has synced
     for (int z = 0; z < ZONE_COUNT; z++) {
       JsonVariantConst zv = v[zoneKey[z]];
       if (zv.isNull()) continue;
@@ -354,11 +369,23 @@ void applyDesired(JsonVariantConst d) {
       if (openVar.isNull()) {
         ovrActive[z] = false;                 // web released the zone -> back to auto
       } else {
-        ovrActive[z]    = true;
-        ovrOpen[z]      = openVar.as<bool>();
-        ovrSource[z]    = 1;                   // web => "manual"
-        ovrExpireSec[z] = nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
-        Serial.printf("WEB %s -> %s (%d min)\n", zones[z].name, ovrOpen[z] ? "OPEN" : "CLOSED", cfg.overrideMinutes);
+        const bool     open       = openVar.as<bool>();
+        const uint64_t untilEpoch = zv["untilEpoch"] | (uint64_t)0;
+        // Discard open commands whose expiry has already passed (stale shadow state).
+        if (open && untilEpoch > 0 && clockOk && untilEpoch <= nowUnix) {
+          Serial.printf("WEB %s: stale command (expired %llus ago), ignoring\n",
+                        zones[z].name, nowUnix - untilEpoch);
+        } else {
+          ovrActive[z]    = true;
+          ovrOpen[z]      = open;
+          ovrSource[z]    = 1;
+          // Use the Lambda-supplied expiry when available; fall back to local config.
+          ovrExpireSec[z] = (untilEpoch > 0 && clockOk)
+                            ? nowSeconds() + (untilEpoch - nowUnix)
+                            : nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
+          Serial.printf("WEB %s -> %s (%llu s remaining)\n", zones[z].name,
+                        open ? "OPEN" : "CLOSE", ovrExpireSec[z] - nowSeconds());
+        }
       }
     }
   }

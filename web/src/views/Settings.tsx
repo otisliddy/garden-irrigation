@@ -17,16 +17,18 @@ interface Props {
 
 export default function Settings({ config, onSave }: Props) {
   const [form, setForm] = useState<Partial<Config>>({});
+  // In-progress edit text, keyed by field. Lets an input hold a transient
+  // empty/partial value (e.g. while deleting digits) without snapping back to
+  // the committed number. Cleared on blur so the field reformats from `form`.
+  const [raw, setRaw] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   useEffect(() => {
-    if (config) setForm(config);
+    if (config) { setForm(config); setRaw({}); }
   }, [config]);
 
-  function setNum(path: string[], val: string) {
-    const n = parseFloat(val);
-    if (isNaN(n)) return;
+  function commitNum(path: string[], n: number) {
     setForm(prev => {
       const next = { ...prev };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,8 +53,43 @@ export default function Settings({ config, onSave }: Props) {
   }
 
   function valAsPct(path: string[]): string {
-    const raw = parseFloat(val(path));
-    return isNaN(raw) ? '' : adcToPct(raw).toString();
+    const adc = parseFloat(val(path));
+    return isNaN(adc) ? '' : adcToPct(adc).toString();
+  }
+
+  function clearRaw(key: string) {
+    setRaw(r => { const next = { ...r }; delete next[key]; return next; });
+  }
+
+  // Props for a plain numeric field: text edits are held in `raw`, and the
+  // parsed number is committed to `form` only when the text is a valid number.
+  function numField(path: string[]) {
+    const key = path.join('.');
+    return {
+      value: key in raw ? raw[key] : val(path),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const text = e.target.value;
+        setRaw(r => ({ ...r, [key]: text }));
+        const n = parseFloat(text);
+        if (!isNaN(n)) commitNum(path, n);
+      },
+      onBlur: () => clearRaw(key),
+    };
+  }
+
+  // Props for a % field whose committed value is stored as ADC in `form`.
+  function pctField(path: string[]) {
+    const key = `pct:${path.join('.')}`;
+    return {
+      value: key in raw ? raw[key] : valAsPct(path),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const text = e.target.value;
+        setRaw(r => ({ ...r, [key]: text }));
+        const pct = parseFloat(text);
+        if (!isNaN(pct)) commitNum(path, pctToAdc(pct));
+      },
+      onBlur: () => clearRaw(key),
+    };
   }
 
   async function handleSave() {
@@ -90,11 +127,7 @@ export default function Settings({ config, onSave }: Props) {
               <input
                 className="s-input"
                 type="number" min="0" max="100"
-                value={valAsPct(['soilThreshold', z])}
-                onChange={e => {
-                  const pct = parseFloat(e.target.value);
-                  if (!isNaN(pct)) setNum(['soilThreshold', z], pctToAdc(pct).toString());
-                }}
+                {...pctField(['soilThreshold', z])}
               />
             </div>
             <div className="settings-row">
@@ -105,11 +138,7 @@ export default function Settings({ config, onSave }: Props) {
               <input
                 className="s-input"
                 type="number" min="0" max="100"
-                value={valAsPct(['soilStop', z])}
-                onChange={e => {
-                  const pct = parseFloat(e.target.value);
-                  if (!isNaN(pct)) setNum(['soilStop', z], pctToAdc(pct).toString());
-                }}
+                {...pctField(['soilStop', z])}
               />
             </div>
           </div>
@@ -127,8 +156,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number" min="0" max="23"
-            value={val(['wateringWindow', 'startHour'])}
-            onChange={e => setNum(['wateringWindow', 'startHour'], e.target.value)}
+            {...numField(['wateringWindow', 'startHour'])}
           />
         </div>
         <div className="settings-row">
@@ -139,8 +167,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number" min="0" max="23"
-            value={val(['wateringWindow', 'endHour'])}
-            onChange={e => setNum(['wateringWindow', 'endHour'], e.target.value)}
+            {...numField(['wateringWindow', 'endHour'])}
           />
         </div>
         <div className="settings-row">
@@ -151,8 +178,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number"
-            value={val(['dailyCapMin'])}
-            onChange={e => setNum(['dailyCapMin'], e.target.value)}
+            {...numField(['dailyCapMin'])}
           />
         </div>
         <div className="settings-row">
@@ -163,8 +189,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number"
-            value={val(['overrideMinutes'])}
-            onChange={e => setNum(['overrideMinutes'], e.target.value)}
+            {...numField(['overrideMinutes'])}
           />
         </div>
       </div>
@@ -180,8 +205,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number" step="0.5"
-            value={val(['rainSkipMm'])}
-            onChange={e => setNum(['rainSkipMm'], e.target.value)}
+            {...numField(['rainSkipMm'])}
           />
         </div>
         <div className="settings-row">
@@ -192,8 +216,7 @@ export default function Settings({ config, onSave }: Props) {
           <input
             className="s-input"
             type="number" step="0.5"
-            value={val(['freezeGuardC'])}
-            onChange={e => setNum(['freezeGuardC'], e.target.value)}
+            {...numField(['freezeGuardC'])}
           />
         </div>
       </div>

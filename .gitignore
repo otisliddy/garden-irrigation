@@ -5,5 +5,9 @@ bin/
 .DS_Store
 Thumbs.db
 
+# Playwright MCP artifacts
+.playwright-mcp/
+*.png
+
 # Note: infra/, web/, and arduino/ have their own .gitignore for
 # node_modules, build output, device certs, and secrets.h.

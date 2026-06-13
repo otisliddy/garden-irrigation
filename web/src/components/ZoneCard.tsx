@@ -11,8 +11,8 @@ interface Props {
   loading: boolean;
 }
 
-const ADC_WET = 1000;
-const ADC_DRY = 3000;
+const ADC_WET = 1300;  // fully submerged
+const ADC_DRY = 3350;  // dry in air
 
 function wetPct(adc: number | null): number {
   if (adc == null) return 50;
@@ -61,7 +61,7 @@ export default function ZoneCard({
                   pointerEvents: 'none',
                 }} />
               </div>
-              <span className="soil-num">{soilValues[i] ?? '—'}</span>
+              <span className="soil-num">{soilValues[i] != null ? wetPct(soilValues[i]!) + '%' : '—'}</span>
             </div>
           );
         })}

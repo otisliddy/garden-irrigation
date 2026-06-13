@@ -87,7 +87,6 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
               <div className="batt-icon">
                 <div className="batt-fill" style={{ width: `${pct}%`, background: col }} />
               </div>
-              <span className="batt-pct">{pct}%</span>
               {status.battV != null && (
                 <span className="batt-v">{status.battV.toFixed(1)}V</span>
               )}

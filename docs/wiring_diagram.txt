@@ -147,14 +147,14 @@ GPIO  Dir  Function                         Connects to
  10   OUT  Beds B  open    (L298N#1 IN1)     L298N #1 IN1
  11   OUT  Beds B  close   (L298N#1 IN2)     L298N #1 IN2
  12   OUT  Beds B  enable  (L298N#1 ENA)     L298N #1 ENA
- 13   IN   Button — Beds A     (RTC / wake)  button → GND, 10k pull-up to 3V3
- 14   IN   Button — Beds B     (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 13   IN   Button — Beds B     (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 14   IN   Button — Polytunnel (RTC / wake)  button → GND, 10k pull-up to 3V3
  16   OUT  Beds A  open    (L298N#1 IN3)     L298N #1 IN3
  17   OUT  Beds A  close   (L298N#1 IN4)     L298N #1 IN4   ⚠ UART1 TX default — do not start Serial1
  18   OUT  Beds A  enable  (L298N#1 ENB)     L298N #1 ENB   ⚠ UART1 RX default — do not start Serial1
  19   —    USB D-  (reserved)                native USB
  20   —    USB D+  (reserved)                native USB
- 21   IN   Button — Polytunnel (RTC / wake)  button → GND, 10k pull-up to 3V3
+ 21   IN   Button — Beds A     (RTC / wake)  button → GND, 10k pull-up to 3V3
  39   OUT  Polytunnel open  (L298N#2 IN1)    L298N #2 IN1
  40   OUT  Polytunnel close (L298N#2 IN2)    L298N #2 IN2
  41   OUT  Polytunnel enable (L298N#2 ENA)   L298N #2 ENA
@@ -393,9 +393,9 @@ standard minimal driver. (Keep the TONGLING module as a spare; see §9d-note.)
 
 ### 9e. Zone buttons  (enhancement #3)
 ```
-   3V3 ─[10k]─┬──► GPIO 13     button → GND      Beds A
-   3V3 ─[10k]─┬──► GPIO 14     button → GND      Beds B
-   3V3 ─[10k]─┬──► GPIO 21     button → GND      Polytunnel
+   3V3 ─[10k]─┬──► GPIO 21     button → GND      Beds A
+   3V3 ─[10k]─┬──► GPIO 13     button → GND      Beds B
+   3V3 ─[10k]─┬──► GPIO 14     button → GND      Polytunnel
               │
            (each button shorts its GPIO to GND when pressed)
 

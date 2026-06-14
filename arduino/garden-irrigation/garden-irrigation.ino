@@ -55,9 +55,10 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #define PIN_PT_EN      41
 
 // Buttons — RTC-capable (EXT1 wake). Active-low, external 10k pull-up to 3V3.
-#define PIN_BTN_A      13
-#define PIN_BTN_B      14
-#define PIN_BTN_POLY   21
+// Pins rotated to match physical wiring: GPIO21→Beds A, GPIO13→Beds B, GPIO14→Polytunnel.
+#define PIN_BTN_A      21
+#define PIN_BTN_B      13
+#define PIN_BTN_POLY   14
 
 #define PIN_LED        42     // status LED via 220Ω
 #define PIN_RELAY      47     // sleep-cutoff relay, PN2222 low-side (HIGH = ON)

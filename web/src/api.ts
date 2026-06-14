@@ -19,7 +19,8 @@ export interface ValveEvent {
   ts: number;
   zone: ZoneName | null;
   action: 'open' | 'close' | null;
-  source: 'auto' | 'manual' | 'override' | 'failclose' | null;
+  // 'app'/'button' are current; 'manual'/'override' are legacy, normalised in the UI.
+  source: 'auto' | 'app' | 'button' | 'manual' | 'override' | 'failclose' | null;
   durationSec: number | null;
 }
 

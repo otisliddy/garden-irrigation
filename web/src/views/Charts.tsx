@@ -43,10 +43,18 @@ function dayKey(ts: number): string {
 
 const SOURCE_COLORS: Record<string, string> = {
   auto:      '#69f0ae',
-  manual:    '#64b5f6',
-  override:  '#ffb300',
+  app:       '#64b5f6',
+  button:    '#ffb300',
   failclose: '#ef5350',
 };
+
+// Older valve-history records used 'manual' (website) and 'override' (physical
+// button); normalise them to the current names so historical bars still render.
+function normSource(s: string | null | undefined): string {
+  if (s === 'manual') return 'app';
+  if (s === 'override') return 'button';
+  return s ?? 'auto';
+}
 
 const CHART_PROPS = { margin: { top: 8, right: 8, left: 0, bottom: 0 } };
 const AXIS_STYLE  = { fill: '#7fa87f', fontSize: 10, fontFamily: 'IBM Plex Mono' };
@@ -282,8 +290,8 @@ function ValvesSection({ data, range }: { data: ValveEvent[]; range: Range }) {
 
 const SOURCE_SERIES = [
   { key: 'auto',      label: 'Auto',       color: '#69f0ae' },
-  { key: 'manual',    label: 'Manual',     color: '#64b5f6' },
-  { key: 'override',  label: 'Override',   color: '#ffb300' },
+  { key: 'app',       label: 'App',        color: '#64b5f6' },
+  { key: 'button',    label: 'Button',     color: '#ffb300' },
   { key: 'failclose', label: 'Fail-close', color: '#ef5350' },
 ];
 
@@ -300,7 +308,7 @@ function buildValveRows(data: ValveEvent[], range: Range): {
   [...data].sort((a, b) => a.ts - b.ts).forEach(ev => {
     if (!ev.zone) return;
     if (ev.action === 'open') {
-      opens.set(ev.zone, { ts: ev.ts, source: ev.source ?? 'auto' });
+      opens.set(ev.zone, { ts: ev.ts, source: normSource(ev.source) });
     } else if (ev.action === 'close') {
       const open = opens.get(ev.zone);
       if (open) {
@@ -321,7 +329,7 @@ function buildValveRows(data: ValveEvent[], range: Range): {
   [...data].sort((a, b) => a.ts - b.ts).forEach(ev => {
     if (!ev.zone) return;
     if (ev.action === 'open') {
-      opens.set(ev.zone, { ts: ev.ts, source: ev.source ?? 'auto' });
+      opens.set(ev.zone, { ts: ev.ts, source: normSource(ev.source) });
     } else if (ev.action === 'close') {
       const open = opens.get(ev.zone);
       if (open) {
@@ -346,7 +354,7 @@ function ValvesChart({ data, range }: { data: ValveEvent[]; range: Range }) {
 
   const { rows, unit, tickFmt } = buildValveRows(data, range);
   const zones: ZoneName[]       = ['bedsA', 'bedsB', 'polytunnel'];
-  const sources                 = ['auto', 'manual', 'override', 'failclose'];
+  const sources                 = ['auto', 'app', 'button', 'failclose'];
 
   return (
     <div className="chart-wrap">

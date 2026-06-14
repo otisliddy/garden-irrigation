@@ -29,7 +29,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.0.0"
+#define FW_VERSION "2.1.0"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -378,7 +378,7 @@ void applyDesired(JsonVariantConst d) {
         } else {
           ovrActive[z]    = true;
           ovrOpen[z]      = open;
-          ovrSource[z]    = 1;
+          ovrSource[z]    = 1;                   // website command => source "app"
           // Use the Lambda-supplied expiry when available; fall back to local config.
           ovrExpireSec[z] = (untilEpoch > 0 && clockOk)
                             ? nowSeconds() + (untilEpoch - nowUnix)
@@ -467,6 +467,7 @@ void applyZone(int z, bool wantOpen, const char* source) {
     valveOpen[z] = true;
     waterStartSec[z] = nowSeconds();
     publishValveEvent(z, "open", source, 0);
+    reportShadow();   // push new valve state to the cloud now, not just in the online loop
   } else if (!wantOpen && valveOpen[z]) {
     const uint32_t dur = (uint32_t)(nowSeconds() - waterStartSec[z]);
     waterTodaySec[z] += dur;
@@ -474,6 +475,7 @@ void applyZone(int z, bool wantOpen, const char* source) {
     closeValve(z);
     valveOpen[z] = false;
     publishValveEvent(z, "close", source, dur);
+    reportShadow();
   }
 }
 
@@ -486,7 +488,7 @@ void handleButton(int z) {
   const bool current = ovrActive[z] ? ovrOpen[z] : valveOpen[z];
   ovrActive[z]    = true;
   ovrOpen[z]      = !current;             // toggle
-  ovrSource[z]    = 0;                    // physical button => "override"
+  ovrSource[z]    = 0;                    // physical button => source "button"
   ovrExpireSec[z] = nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
   Serial.printf("BUTTON %s -> override %s (%d min)\n",
                 zones[z].name, ovrOpen[z] ? "OPEN" : "CLOSED", cfg.overrideMinutes);
@@ -513,9 +515,10 @@ void serviceWatering() {
       Serial.printf("override %s expired\n", zones[z].name);
     }
 
-  // Pass 1 — manual/web overrides (exempt from the one-valve rule).
+  // Pass 1 — web/button overrides (exempt from the one-valve rule).
+  // source: "app" = website button, "button" = physical override button.
   for (int z = 0; z < ZONE_COUNT; z++)
-    if (ovrActive[z]) applyZone(z, ovrOpen[z], ovrSource[z] == 1 ? "manual" : "override");
+    if (ovrActive[z]) applyZone(z, ovrOpen[z], ovrSource[z] == 1 ? "app" : "button");
 
   // Pass 2 — automatic moisture control. At most ONE auto valve, never a second
   // concurrent valve (no master valve: mains can't feed two zones).
@@ -567,6 +570,7 @@ void runActiveCycle() {
   uint32_t lastBattLog = 0;
 
   while (true) {
+    if (mqttReady) mqtt.loop();              // keep the connection (and keepalive) alive
     pollButtons();
     serviceWatering();
     ledTick(currentLed());
@@ -581,8 +585,10 @@ void runActiveCycle() {
 
     // Poll buttons every 50 ms during the inter-tick interval so short presses
     // aren't missed while the main loop is waiting.
-    for (uint32_t t0 = millis(); millis() - t0 < LOOP_INTERVAL_MS; delay(50))
+    for (uint32_t t0 = millis(); millis() - t0 < LOOP_INTERVAL_MS; delay(50)) {
+      if (mqttReady) mqtt.loop();
       pollButtons();
+    }
   }
 }
 
@@ -633,7 +639,7 @@ void logSensors() {
 
 // ===================== Sleep =====================
 void prepareSleepAndSleep() {
-  if (mqttReady) { publishStatus("asleep"); mqtt.loop(); mqtt.disconnect(); }
+  if (mqttReady) { reportShadow(); publishStatus("asleep"); mqtt.loop(); mqtt.disconnect(); }
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 
@@ -735,6 +741,7 @@ void setup() {
     syncTime();
     if (connectMQTT()) {
       online = true;
+      currentMode = "online";       // connected; reportShadow/shadowSync must not log stale "offline"
       shadowSync();                 // pull desired config/commands, apply, report
       publishTelemetry();
       reportShadow();

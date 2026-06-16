@@ -29,7 +29,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.1.0"
+#define FW_VERSION "2.1.1"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -327,7 +327,7 @@ void reportShadow() {
     if (!ovrActive[z] || ovrSource[z] != 1) {
       JsonObject zo = dv.createNestedObject(zoneKey[z]);
       zo["open"]       = false;
-      zo["untilEpoch"] = 0;
+      zo["untilEpoch"] = nullptr;  // null deletes the field from shadow desired; 0 would create a perpetual delta
     }
   }
 
@@ -399,7 +399,9 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
   if (deserializeJson(doc, payload, len)) return;          // ignore malformed
   if (strstr(topic, "/get/accepted"))      applyDesired(doc["state"]["desired"]);
   else if (strstr(topic, "/update/delta")) applyDesired(doc["state"]);
-  reportShadow();                                          // ack what we applied
+  // Do NOT call reportShadow() here: writing desired.valve fields back to the shadow
+  // creates a perpetual delta (reported lacks untilEpoch) which re-fires this callback
+  // at ~18 msg/s. Acks happen via the periodic 60-second report and via applyZone().
 }
 
 // ===================== Connectivity =====================

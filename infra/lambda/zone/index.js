@@ -44,9 +44,13 @@ exports.handler = async (event) => {
   } catch (_) { /* use default */ }
 
   const untilEpoch = open ? Math.floor(Date.now() / 1000) + overrideMinutes * 60 : 0;
+  // untilEpoch is UI-advisory only — returned in the response, never written to the
+  // shadow. In `desired` it has no `reported` counterpart, so it produces a perpetual
+  // delta {valve:{<zone>:{untilEpoch}}} that the firmware reads as "release to auto",
+  // cancelling the override. `null` deletes any value left by a prior write.
   await iot.send(new UpdateThingShadowCommand({
     thingName: THING,
-    payload: Buffer.from(JSON.stringify({ state: { desired: { valve: { [zone]: { open, untilEpoch } } } } })),
+    payload: Buffer.from(JSON.stringify({ state: { desired: { valve: { [zone]: { open, untilEpoch: null } } } } })),
   }));
 
   return {

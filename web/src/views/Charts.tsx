@@ -243,13 +243,24 @@ const CLIMATE_SERIES = [
   { key: 'rh',    label: 'RH %',    color: '#64b5f6' },
 ];
 
+// The DHT11 occasionally emits a garbage sample (e.g. 0 K / -273.15 °C) that skews
+// the auto-scaled temp axis. Treat physically-impossible values as missing; an
+// out-of-range temp means the whole read failed, so drop its paired RH too.
+const TEMP_MIN = -40, TEMP_MAX = 80;   // DHT11 spec is 0–50 °C; padded generously
+function sanitiseClimate(r: SensorRow): { tempC: number | null; rh: number | null } {
+  const tempBad = r.tempC == null || r.tempC < TEMP_MIN || r.tempC > TEMP_MAX;
+  if (tempBad) return { tempC: null, rh: null };
+  const rhBad = r.rh == null || r.rh < 0 || r.rh > 100;
+  return { tempC: r.tempC, rh: rhBad ? null : r.rh };
+}
+
 function ClimateChart({ data, range }: { data: SensorRow[]; range: Range }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (key: string) => setHidden(prev => {
     const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next;
   });
 
-  const rows = data.map(r => ({ ts: fmtTs(r.ts, range), tempC: r.tempC, rh: r.rh }));
+  const rows = data.map(r => ({ ts: fmtTs(r.ts, range), ...sanitiseClimate(r) }));
 
   return (
     <div className="chart-wrap">

@@ -29,7 +29,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.1.1"
+#define FW_VERSION "2.1.2"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -319,15 +319,18 @@ void reportShadow() {
   rep["fw"]            = FW_VERSION;
   rep["lastSeenEpoch"] = (uint32_t)time(nullptr);
 
-  // Clear desired.valve for zones not under an active web override so expired
-  // shadow commands don't re-trigger on the next shadowSync.
+  // Clear any stale web command for zones not under an active web override.
+  // DELETE the whole zone object (null) — do NOT write {open:false}. A lingering
+  // desired.open=false fights auto: when auto opens the valve, the device's own
+  // reported.open=true conflicts with desired.open=false, so the shadow emits a
+  // delta that applyDesired reads as a website "close", slamming the valve shut
+  // ~1s after auto opens it (observed: bedsB watered 1 second, 19/6). A null/absent
+  // zone is simply "no pending command", which applyDesired skips.
   JsonObject des = doc["state"].createNestedObject("desired");
   JsonObject dv  = des.createNestedObject("valve");
   for (int z = 0; z < ZONE_COUNT; z++) {
     if (!ovrActive[z] || ovrSource[z] != 1) {
-      JsonObject zo = dv.createNestedObject(zoneKey[z]);
-      zo["open"]       = false;
-      zo["untilEpoch"] = nullptr;  // null deletes the field from shadow desired; 0 would create a perpetual delta
+      dv[zoneKey[z]] = nullptr;   // delete stale command; no open:false to fight auto
     }
   }
 

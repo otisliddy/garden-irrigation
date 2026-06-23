@@ -8,6 +8,8 @@ Thumbs.db
 # Playwright MCP artifacts
 .playwright-mcp/
 *.png
+# ...but PWA icons are real source assets that must ship
+!web/public/*.png
 
 # Note: infra/, web/, and arduino/ have their own .gitignore for
 # node_modules, build output, device certs, and secrets.h.

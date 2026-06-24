@@ -1,46 +1,53 @@
 # Garden Irrigation
 
-Solar-powered ESP32-S3 irrigation system. Location: Ireland. Scope: 9 raised beds (8'×4') + 2 polytunnel lines, controlled as 3 zones (Beds A, Beds B, Polytunnel). No master valve — mains flow can't water all 9 beds at once, so the beds are split into two independently-watered groups (Beds A = 5 beds, Beds B = 4 beds). Phase: hardware purchased, firmware not yet written.
+Solar-powered ESP32-S3 irrigation for a garden in Glenealy, Ireland. 9 raised beds
+(8'×4') + 2 polytunnel lines, controlled as **3 zones**: Beds A (5 beds), Beds B
+(4 beds), Polytunnel. Personal project. User knows electronics/Arduino — prefers
+concise answers and direct corrections over hedging.
 
-## Docs: hardware design
+## Components
 
-- `docs/purchased.txt` — actual BOM (what's on the shelf)
-- `docs/wiring_diagram.txt`
+- `arduino/garden-irrigation/` — ESP32-S3 firmware (`*.ino`, single file). Online via
+  AWS IoT (MQTT/TLS), degrades to on-device moisture loop when offline. `secrets.h`
+  (git-ignored) holds WiFi + X.509 certs; copy from `secrets.h.example`.
+- `infra/` — AWS CDK (TypeScript). Region `eu-west-1`, profile `personal`. Stacks:
+  `GardenData` + `GardenIot` (built), `GardenApi` + `GardenWeb` (todo). See `README.md`.
+- `web/` — React + Vite PWA, recharts. Dashboard, charts, settings. Not yet deployed.
 
-## Things only in conversation, not in wiring_diagram.txt
+## Authoritative docs (read before changing the matching area)
 
-**No master valve.** The three zones fire independently — no open/close sequencing
-between valves. (The former master valve and its L298N #1 channel A / GPIO 10-12
-were repurposed as the Beds B valve.)
+- `docs/cloud_design.md` — full cloud/web design: MQTT topics, shadow schema, DynamoDB,
+  HTTP API, weather/rain-skip, phases.
+- `docs/wiring_diagram.txt` — pin map & wiring (also mirrored in the .ino pin defines).
+- `docs/notes.txt` — firmware sequencing rules, soil ADC mapping, plumbing notes.
+- `docs/purchased.txt` — actual BOM.
 
-**Fail-closed design (4 layers, in priority order):**
-1. **Boot close pulse** — fire close on all 3 valves every boot, before anything else. Highest-value, always runs.
-2. **Battery voltage ADC** — read once per 15-min wake. Alerting/health only, not a safety mechanism (deep sleep prevents polling).
-3. **Hold-up cap** — 4700–10000µF on 5V rail keeps ESP32 alive ~150ms after power loss. Pairs with Layer 4.
-4. **LM393 comparator** monitoring 12V rail → ESP32 RTC GPIO wake pin. Hardware-level, works during deep sleep. ESP32 wakes in ~10ms on power drop and fires close pulses. **Not yet drawn in wiring_diagram.txt — add when implementing.**
+## Key hardware constraints (drive firmware logic)
 
-Layer 4 is load-bearing. Layers 2–3 alone are insufficient because deep sleep precludes polling.
+- **No master valve.** Mains flow can't feed two zones at once → at most ONE auto
+  valve open at a time (overrides are exempt). Zones latch independently.
+- **Latching solenoids** driven by 2× L298N. A close pulse is a harmless no-op, so
+  close-before-open keeps physical state known. `PULSE_MS` ~50ms.
+- **Sleep-cutoff relay (GPIO 47)** energises only during a pulse; valves hold with
+  zero power. Rule: never drive an L298N IN pin while its module is unpowered —
+  relay ON → settle → pulse → relay OFF (see notes.txt §10 rule 1).
+- **Soil sensors**: 5× capacitive analog on ADC1 (GPIO 1–5). **Higher reading = drier**
+  (dry ~3350, wet ~1300). DHT11 in polytunnel (GPIO 8). Battery sense GPIO 6 (×11 divider).
+- **Buttons** GPIO 21/13/14 (Beds A / Beds B / Poly), active-low, RTC EXT1 wake.
 
-## Software architecture (planned, not built)
+## Fail-closed reality (NOT the original 4-layer plan)
 
-- **ESP32**: 15-min deep-sleep cycle. On wake: read sensors, check schedule, fire valves, report to AWS via MQTT, sleep.
-- **AWS**: schedule logic, rain-skip decision, MQTT broker, persistence with DynamoDB.
-- **Weather**: Met Éireann API (free, no key, authoritative for Ireland). Skip if >Xmm forecast.
-- **UI**: TBD.
+Only the **cold-boot close pulse** is implemented: on a real power-on reset, fire close
+on all 3 valves before anything else. A timer/EXT1 wake must NOT slam valves closed
+(would interrupt watering). The planned hold-up cap + LM393 comparator layers (3 & 4)
+were **dropped**: on total power loss the ESP dies and latching valves hold last state
+until power returns and the boot close-pulse fires (notes.txt §10 rule 5). Battery ADC
+is alerting/health only — no safety action depends on it.
 
-## Power budget (for firmware decisions)
+## Operation
 
-- Peak: ~430mA (WiFi + solenoid fire simultaneously)
-- Typical awake: ~230mA
-- Deep sleep: ~80mA (dominated by L298N quiescent draw, ~40mA per module)
-- Runtime without solar: ~100h at sleep draw
-- Future optimisation: MOSFET to cut 12V to L298N VCC between cycles would slash sleep draw
-
-## Sensor notes
-
-- **Soil sensors**: 5× capacitive, analog. Higher reading = drier. On 3 AWG18 5-core cables: polytunnel (1 soil + DHT11), 2 bed cables (2 soil each). AOUT bypasses the perfboard straight to ESP ADC; VCC/GND come from the perfboard. Battery-sense is on GPIO 6.
-- **DHT11**: 1× in the polytunnel (GPIO 8). Temperature (±2°C) and humidity (±5%). Elegoo module version has onboard pull-up; no perfboard pull-up needed.
-
-## User context
-
-Personal project, not work. User is comfortable with electronics and Arduino fundamentals. Prefers concise answers and direct corrections over hedging.
+15-min deep-sleep cycle. On wake: read sensors, sync time (SNTP), connect AWS, apply
+shadow config/commands, run watering, report telemetry, sleep. Daytime + battery-OK +
+connected → stay awake (modem light-sleep) and responsive to web/buttons. Night or
+offline → one sample + moisture cycle + sleep. Low battery → power-save (no WiFi).
+Always-on draw ~100–120mA (no MOSFET gating of the L298N floor; deferred).

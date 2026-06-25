@@ -3,6 +3,7 @@ import type { DeviceStatus, Weather, SensorRow, Config, ZoneName } from '../api'
 import { api } from '../api';
 import ZoneCard from '../components/ZoneCard';
 import WeatherStrip from '../components/WeatherStrip';
+import FaultModal from '../components/FaultModal';
 
 interface Props {
   status: DeviceStatus | null;
@@ -34,6 +35,7 @@ const ZONES: { zone: ZoneName; label: string; keys: string[]; sensorFields: (key
 export default function Dashboard({ status, weather, latestSensor, config }: Props) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [pendingOpen, setPendingOpen] = useState<Partial<Record<ZoneName, boolean>>>({});
+  const [showFault, setShowFault] = useState(false);
 
   // Clear pending state once the device shadow confirms the expected valve state
   useEffect(() => {
@@ -76,7 +78,11 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
             {status.mode === 'power-save' && (
               <span className="chip chip-powersave">⚡ pwr save</span>
             )}
-            {status.fault && <span className="chip chip-fault">⚠ fault</span>}
+            {status.fault && (
+              <button className="chip chip-fault" onClick={() => setShowFault(true)}>
+                ⚠ fault ⓘ
+              </button>
+            )}
             <div className="batt-wrap" style={{ color: col }}>
               <div className="batt-icon">
                 <div className="batt-fill" style={{ width: `${pct}%`, background: col }} />
@@ -121,6 +127,10 @@ export default function Dashboard({ status, weather, latestSensor, config }: Pro
         <div className="weather-section">
           <WeatherStrip weather={weather} rainSkipThreshMm={config?.rainSkipMm} />
         </div>
+      )}
+
+      {showFault && status && (
+        <FaultModal status={status} config={config} onClose={() => setShowFault(false)} />
       )}
     </div>
   );

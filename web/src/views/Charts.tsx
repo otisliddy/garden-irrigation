@@ -36,6 +36,34 @@ function fmtTs(ts: number, range: Range): string {
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
+// Round, evenly-spaced tick positions for a numeric time axis. Samples arrive at
+// odd minutes (:03/:18/:33/:48), so we can't pick "nice" labels from the data —
+// we generate clock-aligned boundaries (hours / days) within the data span and let
+// recharts place them. Far fewer, never-overlapping labels.
+function timeTicks(min: number, max: number, range: Range): number[] {
+  if (!isFinite(min) || !isFinite(max) || min >= max) return [];
+  const ticks: number[] = [];
+  const d = new Date(min);
+  if (range === '6h' || range === '24h') {
+    const stepH = range === '6h' ? 1 : 3;
+    d.setMinutes(0, 0, 0);
+    d.setHours(Math.ceil(d.getHours() / stepH) * stepH);   // first aligned hour ≥ min
+    while (d.getTime() <= max) {
+      if (d.getTime() >= min) ticks.push(d.getTime());
+      d.setHours(d.getHours() + stepH);                    // Date math keeps wall-clock alignment across DST
+    }
+  } else {
+    const stepD = range === '7d' ? 1 : 5;
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);                            // first midnight after min
+    while (d.getTime() <= max) {
+      if (d.getTime() >= min) ticks.push(d.getTime());
+      d.setDate(d.getDate() + stepD);
+    }
+  }
+  return ticks;
+}
+
 function dayKey(ts: number): string {
   const d = new Date(ts);
   return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -58,18 +86,35 @@ function normSource(s: string | null | undefined): string {
 
 const CHART_PROPS = { margin: { top: 8, right: 8, left: 0, bottom: 0 } };
 const AXIS_STYLE  = { fill: '#7fa87f', fontSize: 10, fontFamily: 'IBM Plex Mono' };
+const TIME_AXIS_STYLE = { fill: '#7fa87f', fontSize: 9, fontFamily: 'IBM Plex Mono' };
 const GRID_PROPS  = { stroke: '#2a3f2a', strokeDasharray: '3 3' };
 const BRUSH_PROPS = { height: 16, stroke: '#2a3f2a', fill: '#0d1f0e', travellerWidth: 6 };
 
-function CustomTooltip({ active, payload, label }: {
+// Shared props for a clock-aligned numeric time X-axis (used by the line charts).
+function timeAxisProps(rows: { ts: number }[], range: Range) {
+  const min = rows.length ? rows[0].ts : NaN;
+  const max = rows.length ? rows[rows.length - 1].ts : NaN;
+  return {
+    dataKey: 'ts',
+    type: 'number' as const,
+    scale: 'time' as const,
+    domain: ['dataMin', 'dataMax'] as [string, string],
+    ticks: timeTicks(min, max, range),
+    tickFormatter: (t: number) => fmtTs(t, range),
+    tick: TIME_AXIS_STYLE,
+  };
+}
+
+function CustomTooltip({ active, payload, label, fmt }: {
   active?: boolean;
   payload?: { name: string; value: number; color: string }[];
-  label?: string;
+  label?: string | number;
+  fmt?: (label: string | number) => string;
 }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-tooltip">
-      <div className="ct-label">{label}</div>
+      <div className="ct-label">{fmt && label != null ? fmt(label) : label}</div>
       {payload.map(p => (
         <div key={p.name} className="ct-row" style={{ color: p.color }}>
           {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
@@ -187,14 +232,16 @@ function MoistureChart({ data, range, config }: { data: SensorRow[]; range: Rang
     const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next;
   });
 
-  const rows = data.map(r => ({
-    ts:       fmtTs(r.ts, range),
-    soilA1:   adcPct(r.soilA1),
-    soilA2:   adcPct(r.soilA2),
-    soilB1:   adcPct(r.soilB1),
-    soilB2:   adcPct(r.soilB2),
-    soilPoly: adcPct(r.soilPoly),
-  }));
+  const rows = data
+    .map(r => ({
+      ts:       r.ts,
+      soilA1:   adcPct(r.soilA1),
+      soilA2:   adcPct(r.soilA2),
+      soilB1:   adcPct(r.soilB1),
+      soilB2:   adcPct(r.soilB2),
+      soilPoly: adcPct(r.soilPoly),
+    }))
+    .sort((a, b) => a.ts - b.ts);
 
   const threshLines = config
     ? [
@@ -213,10 +260,10 @@ function MoistureChart({ data, range, config }: { data: SensorRow[]; range: Rang
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={rows} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid {...GRID_PROPS} />
-          <XAxis dataKey="ts" tick={AXIS_STYLE} interval="preserveStartEnd" />
+          <XAxis {...timeAxisProps(rows, range)} />
           <YAxis tick={AXIS_STYLE} domain={[0, 100]} unit="%" />
-          <Tooltip content={<CustomTooltip />} />
-          <Brush dataKey="ts" {...BRUSH_PROPS} />
+          <Tooltip content={<CustomTooltip fmt={t => fmtTs(Number(t), range)} />} />
+          <Brush dataKey="ts" {...BRUSH_PROPS} tickFormatter={t => fmtTs(Number(t), range)} />
           {threshLines.map(t => (
             <ReferenceLine key={t.label} y={t.pct}
               stroke={t.color} strokeDasharray="4 4" strokeOpacity={0.6}
@@ -260,7 +307,9 @@ function ClimateChart({ data, range }: { data: SensorRow[]; range: Range }) {
     const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next;
   });
 
-  const rows = data.map(r => ({ ts: fmtTs(r.ts, range), ...sanitiseClimate(r) }));
+  const rows = data
+    .map(r => ({ ts: r.ts, ...sanitiseClimate(r) }))
+    .sort((a, b) => a.ts - b.ts);
 
   return (
     <div className="chart-wrap">
@@ -268,11 +317,11 @@ function ClimateChart({ data, range }: { data: SensorRow[]; range: Range }) {
       <ResponsiveContainer width="100%" height={240}>
         <ComposedChart data={rows} margin={{ top: 8, right: 32, left: 4, bottom: 0 }}>
           <CartesianGrid {...GRID_PROPS} />
-          <XAxis dataKey="ts" tick={AXIS_STYLE} interval="preserveStartEnd" />
+          <XAxis {...timeAxisProps(rows, range)} />
           <YAxis yAxisId="temp" tick={AXIS_STYLE} domain={['auto', 'auto']} />
           <YAxis yAxisId="rh" orientation="right" tick={AXIS_STYLE} domain={[0, 100]} />
-          <Tooltip content={<CustomTooltip />} />
-          <Brush dataKey="ts" {...BRUSH_PROPS} />
+          <Tooltip content={<CustomTooltip fmt={t => fmtTs(Number(t), range)} />} />
+          <Brush dataKey="ts" {...BRUSH_PROPS} tickFormatter={t => fmtTs(Number(t), range)} />
           <Area yAxisId="rh" type="monotone" dataKey="rh"
             stroke="#64b5f6" fill="#64b5f620" strokeWidth={1}
             name="RH %" connectNulls hide={hidden.has('rh')}
@@ -474,7 +523,8 @@ function UsageChart({ data, range }: { data: ValveEvent[]; range: Range }) {
 function BatteryChart({ data, range }: { data: SensorRow[]; range: Range }) {
   const rows = data
     .filter(r => r.battV != null)
-    .map(r => ({ ts: fmtTs(r.ts, range), battV: r.battV }));
+    .map(r => ({ ts: r.ts, battV: r.battV }))
+    .sort((a, b) => a.ts - b.ts);
 
   return (
     <div className="chart-wrap">
@@ -482,10 +532,10 @@ function BatteryChart({ data, range }: { data: SensorRow[]; range: Range }) {
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={rows} {...CHART_PROPS}>
           <CartesianGrid {...GRID_PROPS} />
-          <XAxis dataKey="ts" tick={AXIS_STYLE} interval="preserveStartEnd" />
+          <XAxis {...timeAxisProps(rows, range)} />
           <YAxis tick={AXIS_STYLE} domain={[11, 14]} unit="V" />
-          <Tooltip content={<CustomTooltip />} />
-          <Brush dataKey="ts" {...BRUSH_PROPS} />
+          <Tooltip content={<CustomTooltip fmt={t => fmtTs(Number(t), range)} />} />
+          <Brush dataKey="ts" {...BRUSH_PROPS} tickFormatter={t => fmtTs(Number(t), range)} />
           <ReferenceLine y={13.2} stroke="#69f0ae" strokeDasharray="4 4"
             label={{ value: 'full', fill: '#69f0ae', fontSize: 9 }} />
           <ReferenceLine y={11.5} stroke="#ef5350" strokeDasharray="4 4"

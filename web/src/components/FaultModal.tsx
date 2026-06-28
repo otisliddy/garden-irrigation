@@ -98,7 +98,7 @@ export default function FaultModal({ status, config, onClose }: Props) {
           {hits != null && hits.length === 0 && (
             <div className="modal-dim">
               No recent zone reached the daily cap in the last 4 days. The flag may be left
-              over from an earlier event — it persists across sleep until a power-cycle.
+              over from an earlier event — it clears at the next daily counter reset.
             </div>
           )}
           {hits != null && hits.length > 0 && (
@@ -127,8 +127,8 @@ export default function FaultModal({ status, config, onClose }: Props) {
         <div className="modal-section">
           <div className="modal-sec-head">How to clear it</div>
           <ul className="modal-list">
-            <li>The flag is held in RTC memory and only clears on a <b>cold boot</b> —
-              power-cycle the controller (sleep/EXT1 wakes won’t reset it).</li>
+            <li>It clears itself at the next <b>daily counter reset</b> (~24 h after it tripped),
+              or immediately on a <b>power-cycle</b>. It re-trips next day if the cause persists.</li>
             <li>To stop it recurring: raise <b>Daily cap</b>, or lower the <b>stop</b> moisture
               target in Settings so it’s actually reachable.</li>
           </ul>

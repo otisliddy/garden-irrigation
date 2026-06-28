@@ -1,23 +1,11 @@
-// Garden Irrigation — ONLINE production firmware (Phase 2)
-// ESP32-S3 DevKitC-1. Connects to AWS IoT Core over MQTT/TLS for telemetry, remote
-// control and config — but degrades gracefully: if WiFi/MQTT is unavailable it runs
-// the original schedule-free, moisture-driven loop entirely on-device. The cloud is
-// additive, never load-bearing for safe watering or the fail-closed layers.
-//
-// Operating modes (chosen each wake, see setup()):
-//   ONLINE      daytime + battery OK + connected -> stay awake, light/modem sleep,
-//               responsive to web buttons, publish telemetry, honour shadow config.
-//   NIGHT/CYCLE outside the watering window (or connect succeeds but it's night) ->
-//               publish one telemetry sample, run the moisture cycle, deep-sleep 15 min.
-//   OFFLINE     no connectivity -> original on-device moisture loop, deep-sleep 15 min.
-//   POWER-SAVE  battery low -> no WiFi at all, offline moisture loop, deep-sleep.
-//
-// Authoritative hardware map: docs/wiring_diagram.txt §2 + §10. Cloud design:
-// docs/cloud_design.md. Requires libraries: PubSubClient, ArduinoJson, DHT sensor.
-// Credentials live in secrets.h (git-ignored; copy from secrets.h.example).
+// Garden Irrigation — ESP32-S3 online firmware. AWS IoT (MQTT/TLS) for telemetry,
+// remote control and config; degrades to an on-device moisture loop when offline —
+// the cloud is additive, never load-bearing. Modes are chosen each wake (see setup()):
+// ONLINE (awake, responsive), NIGHT/OFFLINE (sample + cycle + 15-min sleep), POWER-SAVE
+// (battery low, no WiFi). Hardware: docs/wiring_diagram.txt. Cloud: docs/cloud_design.md.
+// Libs: PubSubClient, ArduinoJson, DHT. Credentials in secrets.h (git-ignored).
 
-// Must precede #includes so the Arduino preprocessor's auto-generated forward
-// declarations see this type before referencing it.
+// Must precede #includes (Arduino auto-generates forward declarations referencing it).
 enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDLE };
 
 #include <WiFi.h>
@@ -29,7 +17,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.1.3"
+#define FW_VERSION "2.1.4"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -151,8 +139,7 @@ PubSubClient mqtt(net);
 bool mqttReady = false;                 // true once connected + subscribed this wake
 const char* currentMode = "offline";    // reported in status/shadow
 
-// Monotonic clock that survives deep sleep (no RTC chip). Granularity = wake
-// interval, so override/cap timings are accurate to ~one cycle — fine here.
+// Monotonic clock surviving deep sleep (no RTC chip); granularity = one wake cycle.
 uint64_t nowSeconds() { return rtcAccumSec + (uint64_t)(millis() / 1000); }
 
 // ===================== Low-level I/O =====================
@@ -216,8 +203,7 @@ int getLocalHour() {
   return tm.tm_hour;
 }
 
-// Auto-watering is gated to the daytime window. When the clock is unknown (offline,
-// no SNTP) we return true so on-device watering still works as it always did.
+// Daytime-window gate. Clock unknown (offline/no SNTP) => true, so on-device watering works.
 bool withinWindow() {
   const int h = getLocalHour();
   if (h < 0) return true;
@@ -293,8 +279,7 @@ void publishStatus(const char* mode) {
   mqtt.publish(TOPIC_STATUS, buf);
 }
 
-// Report current config + valve state back to the shadow so the website reflects
-// what the device actually applied.
+// Mirror applied config + valve state into shadow `reported` for the website (P1).
 void reportShadow() {
   if (!mqttReady) return;
   JsonDocument doc;
@@ -319,13 +304,9 @@ void reportShadow() {
   rep["fw"]            = FW_VERSION;
   rep["lastSeenEpoch"] = (uint32_t)time(nullptr);
 
-  // Clear any stale web command for zones not under an active web override.
-  // DELETE the whole zone object (null) — do NOT write {open:false}. A lingering
-  // desired.open=false fights auto: when auto opens the valve, the device's own
-  // reported.open=true conflicts with desired.open=false, so the shadow emits a
-  // delta that applyDesired reads as a website "close", slamming the valve shut
-  // ~1s after auto opens it (observed: bedsB watered 1 second, 19/6). A null/absent
-  // zone is simply "no pending command", which applyDesired skips.
+  // GC consumed web commands: DELETE the zone (null), never write {open:false} — a
+  // lingering desired.open=false deltas against auto's reported.open=true and is read
+  // back as a phantom "close". Absent = no pending command (applyDesired skips it).
   JsonObject des = doc["state"].createNestedObject("desired");
   JsonObject dv  = des.createNestedObject("valve");
   for (int z = 0; z < ZONE_COUNT; z++) {
@@ -340,8 +321,7 @@ void reportShadow() {
 }
 
 // ===================== Cloud receive (shadow desired -> local state) =============
-// Apply a shadow `desired` (or delta) object. Missing fields keep their current
-// value via ArduinoJson's `| default` operator.
+// Apply a `desired` (or delta) object; missing fields keep their value via `| default`.
 void applyDesired(JsonVariantConst d) {
   if (d.isNull()) return;
 
@@ -380,21 +360,17 @@ void applyDesired(JsonVariantConst d) {
           Serial.printf("WEB %s: stale command (expired %llus ago), ignoring\n",
                         zones[z].name, nowUnix - untilEpoch);
         } else {
-          // Idempotent: re-reading the shadow with the same still-pending command must
-          // NOT push the expiry forward — otherwise an online device that re-syncs the
-          // shadow each cycle extends the override indefinitely. Only (re)arm the timer
-          // when this is a genuinely new or state-changed command.
+          // Idempotent (P3): only (re)arm the expiry for a new/changed command, so a
+          // re-synced shadow with the same pending command can't extend the override.
           const bool isNew = !ovrActive[z] || ovrSource[z] != 1 || ovrOpen[z] != open;
           ovrActive[z] = true;
           ovrOpen[z]   = open;
           ovrSource[z] = 1;                       // website command => source "app"
-          if (isNew) {
-            // Use the Lambda-supplied expiry when available; fall back to local config.
+          if (isNew)
             ovrExpireSec[z] = (untilEpoch > 0 && clockOk)
                               ? nowSeconds() + (untilEpoch - nowUnix)
                               : nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
-          }
-          Serial.printf("WEB %s -> %s (%llu s remaining)\n", zones[z].name,
+          Serial.printf("WEB %s -> %s (%llu s left)\n", zones[z].name,
                         open ? "OPEN" : "CLOSE", ovrExpireSec[z] - nowSeconds());
         }
       }
@@ -409,9 +385,8 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
   if (deserializeJson(doc, payload, len)) return;          // ignore malformed
   if (strstr(topic, "/get/accepted"))      applyDesired(doc["state"]["desired"]);
   else if (strstr(topic, "/update/delta")) applyDesired(doc["state"]);
-  // Do NOT call reportShadow() here: writing desired.valve fields back to the shadow
-  // creates a perpetual delta (reported lacks untilEpoch) which re-fires this callback
-  // at ~18 msg/s. Acks happen via the periodic 60-second report and via applyZone().
+  // Never reportShadow() here — writing back into the shadow re-deltas and storms this
+  // callback. Acks happen via the periodic report and applyZone() (P4).
 }
 
 // ===================== Connectivity =====================
@@ -517,60 +492,43 @@ void pollButtons() {
 }
 
 // ===================== Watering control (one tick) =====================
-// Shared by the offline active loop and the online loop. Applies overrides, then a
-// single automatic moisture pass honouring the one-valve rule, window, freeze guard,
-// rain-skip (Beds only) and the daily cap.
+// Pure automatic target for one zone (no override): daily cap (raises faultFlag),
+// hysteresis, window, freeze guard, rain-skip (Beds only), one-valve rule (busy).
+bool autoDecide(int z, bool busy, bool windowOK, bool freeze) {
+  const uint32_t capSec = (uint32_t)cfg.dailyCapMin * 60;
+  const int      soil   = readZoneSoil(z);
+  if (valveOpen[z]) {
+    const uint32_t used = waterTodaySec[z] + (uint32_t)(nowSeconds() - waterStartSec[z]);
+    if (used >= capSec) { faultFlag = true; return false; }   // daily cap -> force closed
+    return soil > cfg.soilStop[z];                             // stop once wet enough
+  }
+  const bool isBeds = (z == ZONE_BEDS_A || z == ZONE_BEDS_B);
+  return soil >= cfg.soilStart[z] && !busy && windowOK && !freeze
+         && !(isBeds && rainSkip) && waterTodaySec[z] < capSec;
+}
+
+// Resolve every zone once per tick. Precedence: manual override > auto. A lapsed
+// manual OPEN closes now (bounded session); auto may re-open it the same tick if the
+// soil still reads dry. Overrides are exempt from the one-valve rule but still occupy
+// the bus, so at most one *auto* valve opens (no master valve: mains feeds one zone).
 void serviceWatering() {
-  // Expire lapsed overrides -> control returns to automatic for that zone.
   for (int z = 0; z < ZONE_COUNT; z++)
     if (ovrActive[z] && nowSeconds() >= ovrExpireSec[z]) {
-      const bool  wasOpen = ovrOpen[z];
-      const char* src     = ovrSource[z] == 1 ? "app" : "button";
       ovrActive[z] = false;
-      Serial.printf("override %s expired\n", zones[z].name);
-      // A timed manual OPEN is a bounded watering: close it on expiry rather than
-      // leaving the valve open for the auto pass below to inherit (which would run the
-      // zone on to the daily cap). Auto may legitimately re-open it on this same tick
-      // if the soil still reads dry — that's intended (release back to automatic).
-      if (wasOpen && valveOpen[z]) applyZone(z, false, src);
+      if (valveOpen[z]) applyZone(z, false, ovrSource[z] == 1 ? "app" : "button");
     }
-
-  // Pass 1 — web/button overrides (exempt from the one-valve rule).
-  // source: "app" = website button, "button" = physical override button.
   for (int z = 0; z < ZONE_COUNT; z++)
     if (ovrActive[z]) applyZone(z, ovrOpen[z], ovrSource[z] == 1 ? "app" : "button");
 
-  // Pass 2 — automatic moisture control. At most ONE auto valve, never a second
-  // concurrent valve (no master valve: mains can't feed two zones).
-  const float tC      = dht.readTemperature();
-  const bool  freeze  = !isnan(tC) && tC <= cfg.freezeGuardC;
+  const float tC       = dht.readTemperature();
+  const bool  freeze   = !isnan(tC) && tC <= cfg.freezeGuardC;
   const bool  windowOK = withinWindow();
   bool busy = anyValveOpen();
-
   for (int z = 0; z < ZONE_COUNT; z++) {
     if (ovrActive[z]) continue;
-    const int soil = readZoneSoil(z);
-    if (valveOpen[z]) {
-      const uint32_t sessionSec = (uint32_t)(nowSeconds() - waterStartSec[z]);
-      const bool dailyCap = (waterTodaySec[z] + sessionSec) >= (uint32_t)cfg.dailyCapMin * 60;
-      if (dailyCap) {
-        faultFlag = true;
-        Serial.printf("FAULT %s hit daily cap — forcing closed\n", zones[z].name);
-        applyZone(z, false, "auto");
-      } else if (soil <= cfg.soilStop[z]) {
-        applyZone(z, false, "auto");                 // reached healthy moisture
-      }
-    } else if (soil >= cfg.soilStart[z] && !busy && windowOK && !freeze) {
-      const bool isBeds = (z == ZONE_BEDS_A || z == ZONE_BEDS_B);
-      if (isBeds && rainSkip) {
-        Serial.printf("SKIP %s: rain forecast\n", zones[z].name);
-      } else if (waterTodaySec[z] >= (uint32_t)cfg.dailyCapMin * 60) {
-        Serial.printf("SKIP %s: daily cap reached (%d min)\n", zones[z].name, cfg.dailyCapMin);
-      } else {
-        applyZone(z, true, "auto");
-        busy = true;
-      }
-    }
+    const bool open = autoDecide(z, busy, windowOK, freeze);
+    if (open) busy = true;
+    applyZone(z, open, "auto");
   }
 }
 
@@ -583,9 +541,8 @@ LedMode currentLed() {
 }
 
 // ===================== Offline / finish-watering loop =====================
-// Stays awake while any valve is open (shows the watering LED, monitors moisture,
-// honours buttons). Exits to sleep the moment everything is closed. Used as the
-// offline path and to drain any in-progress watering before deep sleep.
+// Stays awake while any valve is open (LED, moisture, buttons); exits to sleep once
+// everything is closed. Offline path + drains in-progress watering before deep sleep.
 void runActiveCycle() {
   uint32_t lastBattLog = 0;
 
@@ -603,8 +560,7 @@ void runActiveCycle() {
 
     if (!anyValveOpen()) break;                // nothing to do -> sleep
 
-    // Poll buttons every 50 ms during the inter-tick interval so short presses
-    // aren't missed while the main loop is waiting.
+    // Poll buttons every 50 ms between ticks so short presses aren't missed.
     for (uint32_t t0 = millis(); millis() - t0 < LOOP_INTERVAL_MS; delay(50)) {
       if (mqttReady) mqtt.loop();
       pollButtons();
@@ -613,9 +569,8 @@ void runActiveCycle() {
 }
 
 // ===================== Online loop (daytime, connected, battery OK) =============
-// Stays awake and responsive: services MQTT, buttons and watering; publishes
-// telemetry every 15 min and a status/shadow report every minute. Returns (to let
-// the device deep-sleep) when the battery drops or the watering window ends.
+// Awake + responsive: services MQTT/buttons/watering, publishes telemetry every 15 min
+// and a report every minute. Returns (to deep-sleep) when battery drops or window ends.
 void runOnlineLoop() {
   uint32_t lastTelemetry = millis();
   uint32_t lastReport    = millis();
@@ -670,8 +625,7 @@ void prepareSleepAndSleep() {
   // Advance the monotonic clock by this awake span plus the upcoming sleep.
   rtcAccumSec += (uint64_t)(millis() / 1000) + (uint64_t)SLEEP_MIN * 60;
 
-  // Wait for any held button to release — if still held when we sleep, EXT1
-  // fires instantly and the wake handler toggles the zone straight back open.
+  // Wait for held buttons to release, else EXT1 fires instantly and re-toggles the zone.
   for (int z = 0; z < ZONE_COUNT; z++)
     while (digitalRead(zones[z].btn) == LOW) delay(10);
   delay(50);  // debounce
@@ -735,10 +689,12 @@ void setup() {
       if (mask & (1ULL << zones[z].btn)) { lastBtn[z] = LOW; handleButton(z); }
   }
 
-  // Reset daily watering counters once 24 h has elapsed.
+  // Reset daily watering counters once 24 h has elapsed. The cap fault is tied to
+  // these counters, so it clears here too (re-trips next day if the cause persists).
   if (nowSeconds() - dayStartSec >= 86400ULL) {
     dayStartSec = nowSeconds();
     for (int z = 0; z < ZONE_COUNT; z++) waterTodaySec[z] = 0;
+    faultFlag = false;
     Serial.println("daily water counters reset");
   }
 
@@ -780,8 +736,7 @@ void setup() {
     currentMode = "offline";
   }
 
-  // Drain any in-progress watering (closes when wet), then deep sleep. On the next
-  // wake we reconnect and publish again — overnight this gives a 15-min cadence.
+  // Drain in-progress watering (closes when wet), then deep sleep (15-min cadence).
   runActiveCycle();
   prepareSleepAndSleep();
 }

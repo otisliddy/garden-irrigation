@@ -29,7 +29,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.1.2"
+#define FW_VERSION "2.1.3"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -380,13 +380,20 @@ void applyDesired(JsonVariantConst d) {
           Serial.printf("WEB %s: stale command (expired %llus ago), ignoring\n",
                         zones[z].name, nowUnix - untilEpoch);
         } else {
-          ovrActive[z]    = true;
-          ovrOpen[z]      = open;
-          ovrSource[z]    = 1;                   // website command => source "app"
-          // Use the Lambda-supplied expiry when available; fall back to local config.
-          ovrExpireSec[z] = (untilEpoch > 0 && clockOk)
-                            ? nowSeconds() + (untilEpoch - nowUnix)
-                            : nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
+          // Idempotent: re-reading the shadow with the same still-pending command must
+          // NOT push the expiry forward — otherwise an online device that re-syncs the
+          // shadow each cycle extends the override indefinitely. Only (re)arm the timer
+          // when this is a genuinely new or state-changed command.
+          const bool isNew = !ovrActive[z] || ovrSource[z] != 1 || ovrOpen[z] != open;
+          ovrActive[z] = true;
+          ovrOpen[z]   = open;
+          ovrSource[z] = 1;                       // website command => source "app"
+          if (isNew) {
+            // Use the Lambda-supplied expiry when available; fall back to local config.
+            ovrExpireSec[z] = (untilEpoch > 0 && clockOk)
+                              ? nowSeconds() + (untilEpoch - nowUnix)
+                              : nowSeconds() + (uint64_t)cfg.overrideMinutes * 60;
+          }
           Serial.printf("WEB %s -> %s (%llu s remaining)\n", zones[z].name,
                         open ? "OPEN" : "CLOSE", ovrExpireSec[z] - nowSeconds());
         }
@@ -517,8 +524,15 @@ void serviceWatering() {
   // Expire lapsed overrides -> control returns to automatic for that zone.
   for (int z = 0; z < ZONE_COUNT; z++)
     if (ovrActive[z] && nowSeconds() >= ovrExpireSec[z]) {
+      const bool  wasOpen = ovrOpen[z];
+      const char* src     = ovrSource[z] == 1 ? "app" : "button";
       ovrActive[z] = false;
       Serial.printf("override %s expired\n", zones[z].name);
+      // A timed manual OPEN is a bounded watering: close it on expiry rather than
+      // leaving the valve open for the auto pass below to inherit (which would run the
+      // zone on to the daily cap). Auto may legitimately re-open it on this same tick
+      // if the soil still reads dry — that's intended (release back to automatic).
+      if (wasOpen && valveOpen[z]) applyZone(z, false, src);
     }
 
   // Pass 1 — web/button overrides (exempt from the one-valve rule).

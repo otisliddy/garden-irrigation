@@ -17,7 +17,7 @@ enum LedMode { LED_OFF, LED_SOLID, LED_WATERING, LED_FAULT, LED_LOWBATT, LED_IDL
 #include "esp_sleep.h"
 #include "secrets.h"
 
-#define FW_VERSION "2.1.4"
+#define FW_VERSION "2.1.5"
 
 // ===================== Pin map (docs/wiring_diagram.txt §2) =====================
 // Soil sensors — ADC1 only (reliable with radio on). Higher reading = drier.
@@ -125,11 +125,16 @@ RTC_DATA_ATTR bool     ovrActive[ZONE_COUNT];      // manual override engaged
 RTC_DATA_ATTR bool     ovrOpen[ZONE_COUNT];        // override target state
 RTC_DATA_ATTR uint8_t  ovrSource[ZONE_COUNT];      // 0 = button, 1 = web
 RTC_DATA_ATTR uint64_t ovrExpireSec[ZONE_COUNT];   // override lapse time
-RTC_DATA_ATTR uint64_t rtcAccumSec = 0;            // monotonic seconds across sleeps
-RTC_DATA_ATTR bool     faultFlag = false;          // a watering hit its cap
+RTC_DATA_ATTR uint8_t  faultCode = 0;              // 0 none, see FaultCode
+RTC_DATA_ATTR int8_t   faultZone = -1;             // zone that faulted (-1 = n/a)
 RTC_DATA_ATTR uint32_t waterTodaySec[ZONE_COUNT];  // watering seconds used today per zone
 RTC_DATA_ATTR uint64_t dayStartSec = 0;            // when the current 24h window began
 RTC_DATA_ATTR bool     rainSkip = false;           // cloud-set: skip Beds A/B watering
+
+enum FaultCode { FAULT_NONE = 0, FAULT_DAILY_CAP = 1 };
+const char* faultReasonStr(uint8_t c) {
+  switch (c) { case FAULT_DAILY_CAP: return "daily-cap"; default: return "none"; }
+}
 
 DHT dht(PIN_DHT, DHT11);
 int lastBtn[ZONE_COUNT] = { HIGH, HIGH, HIGH };
@@ -139,8 +144,10 @@ PubSubClient mqtt(net);
 bool mqttReady = false;                 // true once connected + subscribed this wake
 const char* currentMode = "offline";    // reported in status/shadow
 
-// Monotonic clock surviving deep sleep (no RTC chip); granularity = one wake cycle.
-uint64_t nowSeconds() { return rtcAccumSec + (uint64_t)(millis() / 1000); }
+// Wall-clock seconds. The ESP32 RTC keeps system time across deep sleep (and counts
+// real elapsed time, so button/EXT1 wakes don't drift); it starts at "seconds since
+// boot" and syncTime() jumps it to epoch once SNTP lands (deadlines migrated there).
+uint64_t nowSeconds() { return (uint64_t)time(nullptr); }
 
 // ===================== Low-level I/O =====================
 void allDriveLow() {
@@ -272,7 +279,7 @@ void publishStatus(const char* mode) {
   doc["mode"]    = mode;
   doc["battV"]   = vb;
   doc["battLow"] = vb < cfg.battLowV;       // health rule alerts on this
-  doc["fault"]   = faultFlag;               // ...and this
+  doc["fault"]   = faultCode != 0;          // ...and this (keep boolean for the rule)
   doc["fw"]      = FW_VERSION;
   char buf[192];
   serializeJson(doc, buf, sizeof(buf));
@@ -299,7 +306,9 @@ void reportShadow() {
   for (int z = 0; z < ZONE_COUNT; z++) { JsonObject zo = v.createNestedObject(zoneKey[z]); zo["open"] = valveOpen[z]; }
   rep["mode"]          = currentMode;
   rep["battV"]         = readBatt();
-  rep["fault"]         = faultFlag;
+  rep["fault"]         = faultCode != 0;
+  rep["faultReason"]   = faultReasonStr(faultCode);
+  rep["faultZone"]     = (faultZone >= 0 && faultZone < ZONE_COUNT) ? zoneKey[faultZone] : "";
   rep["rainSkip"]      = rainSkip;
   rep["fw"]            = FW_VERSION;
   rep["lastSeenEpoch"] = (uint32_t)time(nullptr);
@@ -402,10 +411,19 @@ bool connectWiFi() {
 }
 
 void syncTime() {
+  const uint64_t before = nowSeconds();
   // Europe/Dublin: GMT in winter, IST (UTC+1) in summer.
   configTzTime("GMT0IST,M3.5.0/1,M10.5.0", "pool.ntp.org", "time.google.com");
   struct tm tm;
   for (uint32_t t0 = millis(); !getLocalTime(&tm, 0) && millis() - t0 < 5000; ) delay(200);
+  // The first sync jumps the clock from "seconds since boot" to epoch. Shift in-flight
+  // deadlines by that jump so override/cap/day durations are preserved (P3).
+  const uint64_t after = nowSeconds();
+  if (after > 1700000000ULL && after > before + 86400ULL) {
+    const uint64_t d = after - before;
+    for (int z = 0; z < ZONE_COUNT; z++) { waterStartSec[z] += d; ovrExpireSec[z] += d; }
+    dayStartSec += d;
+  }
 }
 
 bool subscribeShadow() {
@@ -492,14 +510,14 @@ void pollButtons() {
 }
 
 // ===================== Watering control (one tick) =====================
-// Pure automatic target for one zone (no override): daily cap (raises faultFlag),
+// Pure automatic target for one zone (no override): daily cap (raises a fault),
 // hysteresis, window, freeze guard, rain-skip (Beds only), one-valve rule (busy).
 bool autoDecide(int z, bool busy, bool windowOK, bool freeze) {
   const uint32_t capSec = (uint32_t)cfg.dailyCapMin * 60;
   const int      soil   = readZoneSoil(z);
   if (valveOpen[z]) {
     const uint32_t used = waterTodaySec[z] + (uint32_t)(nowSeconds() - waterStartSec[z]);
-    if (used >= capSec) { faultFlag = true; return false; }   // daily cap -> force closed
+    if (used >= capSec) { faultCode = FAULT_DAILY_CAP; faultZone = z; return false; }  // cap -> force closed
     return soil > cfg.soilStop[z];                             // stop once wet enough
   }
   const bool isBeds = (z == ZONE_BEDS_A || z == ZONE_BEDS_B);
@@ -534,7 +552,7 @@ void serviceWatering() {
 
 LedMode currentLed() {
   const bool battLow = readBatt() < cfg.battLowV;
-  if (faultFlag)       return LED_FAULT;
+  if (faultCode)       return LED_FAULT;
   if (battLow)         return LED_LOWBATT;
   if (anyValveOpen())  return LED_WATERING;
   return LED_IDLE;
@@ -622,9 +640,6 @@ void prepareSleepAndSleep() {
   relayOff();
   digitalWrite(PIN_LED, LOW);
 
-  // Advance the monotonic clock by this awake span plus the upcoming sleep.
-  rtcAccumSec += (uint64_t)(millis() / 1000) + (uint64_t)SLEEP_MIN * 60;
-
   // Wait for held buttons to release, else EXT1 fires instantly and re-toggles the zone.
   for (int z = 0; z < ZONE_COUNT; z++)
     while (digitalRead(zones[z].btn) == LOW) delay(10);
@@ -672,7 +687,7 @@ void setup() {
 
   if (coldBoot) {
     Serial.println("\n=== COLD BOOT ===");
-    rtcInit = true; rtcAccumSec = 0; faultFlag = false; rainSkip = false;
+    rtcInit = true; faultCode = FAULT_NONE; faultZone = -1; rainSkip = false;
     for (int z = 0; z < ZONE_COUNT; z++) { ovrActive[z] = false; waterStartSec[z] = 0; waterTodaySec[z] = 0; }
     dayStartSec = 0;
     seedConfigDefaults();
@@ -694,7 +709,7 @@ void setup() {
   if (nowSeconds() - dayStartSec >= 86400ULL) {
     dayStartSec = nowSeconds();
     for (int z = 0; z < ZONE_COUNT; z++) waterTodaySec[z] = 0;
-    faultFlag = false;
+    faultCode = FAULT_NONE; faultZone = -1;
     Serial.println("daily water counters reset");
   }
 

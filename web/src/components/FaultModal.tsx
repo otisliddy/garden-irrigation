@@ -53,10 +53,21 @@ function fmtWhen(ms: number): string {
   });
 }
 
+// Known fault reasons the device reports (status.faultReason). Unknown/older-firmware
+// reasons fall through to a generic message so the modal never lies about the cause.
+const KNOWN_REASONS = new Set(['daily-cap']);
+
 export default function FaultModal({ status, config, onClose }: Props) {
   const [hits, setHits] = useState<CapHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const capMin = config?.dailyCapMin ?? 90;
+
+  // Prefer the device's authoritative reason/zone; fall back to daily-cap (the only
+  // cause pre-2.1.5) when the firmware doesn't report one yet.
+  const reason = status.faultReason && status.faultReason !== 'none' ? status.faultReason : null;
+  const isCap  = reason === 'daily-cap' || reason == null;
+  const known  = reason == null || KNOWN_REASONS.has(reason);
+  const faultZoneLabel = status.faultZone ? ZONE_LABEL[status.faultZone] : null;
 
   useEffect(() => {
     let alive = true;
@@ -85,14 +96,27 @@ export default function FaultModal({ status, config, onClose }: Props) {
           <button className="modal-x" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        <p className="modal-lead">
-          A zone’s watering ran the full <b>daily cap ({capMin} min)</b> without the soil
-          reaching its stop level, so the firmware force-closed the valve and raised a fault.
-          It’s a safety stop — nothing is broken or stuck open.
-        </p>
+        {isCap ? (
+          <p className="modal-lead">
+            {faultZoneLabel ? <><b>{faultZoneLabel}</b>’s</> : 'A zone’s'} watering ran the full{' '}
+            <b>daily cap ({capMin} min)</b> without the soil reaching its stop level, so the
+            firmware force-closed the valve and raised a fault. It’s a safety stop — nothing is
+            broken or stuck open.
+          </p>
+        ) : (
+          <p className="modal-lead">
+            The device reported a fault{faultZoneLabel ? <> on <b>{faultZoneLabel}</b></> : ''}:{' '}
+            <b>{status.faultReason}</b>{known ? '' : ' (unrecognised by this app version)'}.
+          </p>
+        )}
 
         <div className="modal-section">
           <div className="modal-sec-head">What happened</div>
+          {faultZoneLabel && (
+            <div className="modal-dim" style={{ marginBottom: 6 }}>
+              Device reports: <b className="modal-hl">{faultZoneLabel}</b> · {status.faultReason ?? 'fault'}
+            </div>
+          )}
           {error && <div className="modal-dim">Couldn’t load valve history: {error}</div>}
           {!error && hits == null && <div className="modal-dim">Loading valve history…</div>}
           {hits != null && hits.length === 0 && (
@@ -114,23 +138,27 @@ export default function FaultModal({ status, config, onClose }: Props) {
           )}
         </div>
 
-        <div className="modal-section">
-          <div className="modal-sec-head">Likely cause</div>
-          <ul className="modal-list">
-            <li>Soil never got wet enough to hit the <b>stop</b> threshold — the target may be
-              set wetter than the bed physically reaches, so it waters until the cap.</li>
-            <li>Or water isn’t reaching that bed (closed/blocked drip line, or a valve that
-              didn’t physically open) — moisture stays flat while the valve is “open”.</li>
-          </ul>
-        </div>
+        {isCap && (
+          <div className="modal-section">
+            <div className="modal-sec-head">Likely cause</div>
+            <ul className="modal-list">
+              <li>Soil never got wet enough to hit the <b>stop</b> threshold — the target may be
+                set wetter than the bed physically reaches, so it waters until the cap.</li>
+              <li>Or water isn’t reaching that bed (closed/blocked drip line, or a valve that
+                didn’t physically open) — moisture stays flat while the valve is “open”.</li>
+            </ul>
+          </div>
+        )}
 
         <div className="modal-section">
           <div className="modal-sec-head">How to clear it</div>
           <ul className="modal-list">
             <li>It clears itself at the next <b>daily counter reset</b> (~24 h after it tripped),
               or immediately on a <b>power-cycle</b>. It re-trips next day if the cause persists.</li>
-            <li>To stop it recurring: raise <b>Daily cap</b>, or lower the <b>stop</b> moisture
-              target in Settings so it’s actually reachable.</li>
+            {isCap && (
+              <li>To stop it recurring: raise <b>Daily cap</b>, or lower the <b>stop</b> moisture
+                target in Settings so it’s actually reachable.</li>
+            )}
           </ul>
         </div>
 

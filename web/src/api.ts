@@ -38,6 +38,8 @@ export interface DeviceStatus {
   mode: string;
   battV: number | null;
   fault: boolean;
+  faultReason?: string | null;   // e.g. 'daily-cap'; null/'none' when no fault
+  faultZone?: ZoneName | null;   // zone that faulted, if known
   fw: string | null;
   lastSeenEpoch: number;
   online: boolean;

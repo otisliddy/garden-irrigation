@@ -28,6 +28,8 @@ exports.handler = async () => {
       mode: reported.mode ?? 'unknown',
       battV: reported.battV ?? null,
       fault: reported.fault ?? false,
+      faultReason: reported.faultReason ?? null,
+      faultZone: reported.faultZone || null,
       fw: reported.fw ?? null,
       lastSeenEpoch: lastSeen,
       online: lastSeen > 0 && (now - lastSeen) < OFFLINE_THRESHOLD_SEC,
